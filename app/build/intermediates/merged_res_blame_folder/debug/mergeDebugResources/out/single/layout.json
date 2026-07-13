@@ -1,0 +1,38 @@
+[
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\item_student.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\item_student.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_register.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_register.xml"
+    },
+    {
+        "merged": "com.school.attendance.app-mergeDebugResources-43:/layout/activity_student_attendance_scan.xml",
+        "source": "com.school.attendance.app-main-46:/layout/activity_student_attendance_scan.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_forgot_password.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_forgot_password.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_mark_attendance.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_mark_attendance.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_mark_teacher_attendance.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_mark_teacher_attendance.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_student_attendance_scan.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_student_attendance_scan.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_login.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_login.xml"
+    },
+    {
+        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-mergeDebugResources-43:\\layout\\activity_dashboard.xml",
+        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_dashboard.xml"
+    }
+]
