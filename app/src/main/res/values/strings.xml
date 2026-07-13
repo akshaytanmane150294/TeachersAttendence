@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">Govt School Attendance</string>
+
+    <string name="login_title">Teacher Login</string>
+    <string name="login_subtitle">Sign in to mark attendance</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+    <string name="btn_login">Login</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="no_account">Don\'t have an account? Register</string>
+
+    <string name="register_title">Teacher Registration</string>
+    <string name="full_name_hint">Full Name</string>
+    <string name="employee_id_hint">Employee ID</string>
+    <string name="city_hint">City</string>
+    <string name="district_hint">District</string>
+    <string name="state_hint">State</string>
+    <string name="subject_hint">Subject Taught</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+    <string name="btn_register">Register</string>
+    <string name="have_account">Already have an account? Login</string>
+
+    <string name="forgot_title">Reset Password</string>
+    <string name="forgot_subtitle">Enter your registered email. We will send a password reset link.</string>
+    <string name="btn_send_reset">Send Reset Link</string>
+    <string name="back_to_login">Back to Login</string>
+
+    <string name="dashboard_title">Welcome, Teacher</string>
+    <string name="mark_attendance">Mark Attendance</string>
+    <string name="my_profile">My Profile</string>
+    <string name="logout">Logout</string>
+</resources>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center_horizontal"
+    android:background="@color/background">
+
+    <TextView
+        android:id="@+id/tvSchoolNameDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="School Name"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/primary"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvTeacherNameDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Teacher Name"
+        android:textSize="16sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="24dp"/>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        app:cardCornerRadius="100dp"
+        app:cardElevation="4dp"
+        android:layout_marginBottom="24dp">
+
+        <ImageView
+            android:id="@+id/ivSchoolPhoto"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_camera_placeholder"
+            android:background="#EEE"/>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCapture"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Capture School Photo"
+        app:icon="@drawable/ic_camera"
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+    <TextView
+        android:id="@+id/tvLocationStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Checking location..."
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <LinearLayout
+        android:id="@+id/layoutSuccessInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:id="@+id/tvSuccessMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Marked Successfully"
+            android:textColor="@color/success"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textAlignment="center"/>
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSubmitAttendance"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="MARK ATTENDANCE"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:enabled="false"
+        android:backgroundTint="@color/accent"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnStudentAttendance"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Student Attendance (Scan Paper)"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        app:icon="@drawable/ic_camera"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnLogout"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="LOGOUT"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+        android:backgroundTint="@color/primary"/>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"/>
+
+</LinearLayout>

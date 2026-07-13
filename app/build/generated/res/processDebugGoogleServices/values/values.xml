@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gcm_defaultSenderId" translatable="false">576243984805</string>
+    <string name="google_api_key" translatable="false">AIzaSyAF5qgPPoE-Gz1gRjOsCBWlaWknSq1zN7c</string>
+    <string name="google_app_id" translatable="false">1:576243984805:android:623751802e88783370204c</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyAF5qgPPoE-Gz1gRjOsCBWlaWknSq1zN7c</string>
+    <string name="google_storage_bucket" translatable="false">schoolattendance-3aea1.firebasestorage.app</string>
+    <string name="project_id" translatable="false">schoolattendance-3aea1</string>
+</resources>
