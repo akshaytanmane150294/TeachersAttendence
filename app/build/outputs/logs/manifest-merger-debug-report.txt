@@ -1,20 +1,9 @@
 -- Merging decision tree log ---
-provider#androidx.core.content.FileProvider
-INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:40:9-48:20
-	android:grantUriPermissions
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:44:13-47
-	android:authorities
-		INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:42:13-64
-	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:43:13-37
-	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:41:13-62
 manifest
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-52:12
-INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-52:12
-INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-52:12
-INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-52:12
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-58:12
+INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-58:12
+INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-58:12
+INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:2:1-58:12
 MERGED from [androidx.databinding:viewbinding:8.3.0] C:\Users\aksha\.gradle\caches\9.3.0\transforms\943324e82e0f2091c912013e4de8c447\workspace\transformed\viewbinding-8.3.0\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.android.material:material:1.12.0] C:\Users\aksha\.gradle\caches\9.3.0\transforms\5665bad291eb3708a393b5aaf0d40e10\workspace\transformed\material-1.12.0\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\aksha\.gradle\caches\9.3.0\transforms\6b7b31f39ed890f7544ac4b58a729c83\workspace\transformed\constraintlayout-2.1.4\AndroidManifest.xml:2:1-11:12
@@ -144,14 +133,20 @@ ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\ma
 	android:name
 		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:9:19-57
 queries
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:11:5-13:15
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:11:5-16:15
 package#com.google.android.gms
 ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:12:9-58
 	android:name
 		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:12:18-55
+intent#action:name:android.media.action.IMAGE_CAPTURE
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:13:9-15:18
+action#android.media.action.IMAGE_CAPTURE
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:14:13-73
+	android:name
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:14:21-70
 application
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:15:5-50:19
-INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:15:5-50:19
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:18:5-56:19
+INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:18:5-56:19
 MERGED from [com.google.android.material:material:1.12.0] C:\Users\aksha\.gradle\caches\9.3.0\transforms\5665bad291eb3708a393b5aaf0d40e10\workspace\transformed\material-1.12.0\AndroidManifest.xml:22:5-20
 MERGED from [com.google.android.material:material:1.12.0] C:\Users\aksha\.gradle\caches\9.3.0\transforms\5665bad291eb3708a393b5aaf0d40e10\workspace\transformed\material-1.12.0\AndroidManifest.xml:22:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] C:\Users\aksha\.gradle\caches\9.3.0\transforms\6b7b31f39ed890f7544ac4b58a729c83\workspace\transformed\constraintlayout-2.1.4\AndroidManifest.xml:9:5-20
@@ -223,85 +218,101 @@ MERGED from [com.google.android.odml:image:1.0.0-beta1] C:\Users\aksha\.gradle\c
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.1] C:\Users\aksha\.gradle\caches\9.3.0\transforms\df7a413ebbf689623897bb3b74cf01c8\workspace\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:20:9-35
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:23:9-35
 	android:label
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:18:9-41
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:21:9-41
 	android:roundIcon
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:19:9-54
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:22:9-54
 	android:icon
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:17:9-43
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:20:9-43
 	android:allowBackup
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:16:9-35
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:19:9-35
 	android:theme
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:21:9-54
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:24:9-54
 activity#com.school.attendance.SplashActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:23:9-30:20
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:26:9-33:20
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:25:13-36
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:28:13-36
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:24:13-43
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:27:13-43
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:26:13-29:29
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:29:13-32:29
 action#android.intent.action.MAIN
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:27:17-69
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:30:17-69
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:27:25-66
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:30:25-66
 category#android.intent.category.LAUNCHER
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:28:17-77
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:31:17-77
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:28:27-74
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:31:27-74
 activity#com.school.attendance.LoginActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:32:9-119
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:9-119
 	android:windowSoftInputMode
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:32:74-116
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:74-116
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:32:49-73
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:49-73
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:32:19-48
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:19-48
 activity#com.school.attendance.RegisterActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:33:9-122
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:9-122
 	android:windowSoftInputMode
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:33:77-119
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:77-119
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:33:52-76
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:52-76
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:33:19-51
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:19-51
 activity#com.school.attendance.ForgotPasswordActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:34:9-85
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:9-85
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:34:58-82
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:58-82
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:34:19-57
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:19-57
 activity#com.school.attendance.DashboardActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:9-80
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:9-80
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:53-77
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:53-77
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:35:19-52
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:19-52
 activity#com.school.attendance.MarkAttendanceActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:9-85
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:39:9-85
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:58-82
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:39:58-82
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:36:19-57
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:39:19-57
 activity#com.school.attendance.MarkTeacherAttendanceActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:9-92
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:40:9-92
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:65-89
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:40:65-89
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:37:19-64
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:40:19-64
 activity#com.school.attendance.StudentAttendanceScanActivity
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:9-92
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:41:9-92
 	android:exported
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:65-89
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:41:65-89
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:38:19-64
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:41:19-64
+provider#androidx.core.content.FileProvider
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:43:9-54:20
+	android:grantUriPermissions
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:47:13-47
+	android:authorities
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:45:13-69
+	android:exported
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:46:13-37
+	android:name
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:44:13-62
 meta-data#android.support.FILE_PATHS
-ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:45:13-47:54
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:48:13-50:54
 	android:resource
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:47:17-51
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:50:17-51
 	android:name
-		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:46:17-58
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:49:17-58
+meta-data#android.support.FILE_PROVIDER_PATHS
+ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:51:13-53:54
+	android:resource
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:53:17-51
+	android:name
+		ADDED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml:52:17-67
 uses-sdk
 INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\aksha\Downloads\SchoolAttendance\SchoolAttendance\app\src\main\AndroidManifest.xml
