@@ -3,22 +3,32 @@ package com.school.attendance
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
-import com.google.firebase.auth.FirebaseAuth
+import androidx.exifinterface.media.ExifInterface
+import androidx.lifecycle.lifecycleScope
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.BlockThreshold
+import com.google.ai.client.generativeai.type.HarmCategory
+import com.google.ai.client.generativeai.type.SafetySetting
+import com.google.ai.client.generativeai.type.content
+import com.google.ai.client.generativeai.type.generationConfig
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.firebase.firestore.SetOptions
 import com.school.attendance.databinding.ActivityStudentAttendanceScanBinding
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -28,32 +38,47 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityStudentAttendanceScanBinding
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
-    
+
+    // API Key from screenshot
+    private val GEMINI_API_KEY = "AQ.Ab8RN6KLrlUxt7SOWuxqMnZnKEEJHkus9KL19p1Zcquu5yd3QQ"
+
+    private val generativeModel = GenerativeModel(
+        modelName = "gemini-1.5-flash",
+        apiKey = GEMINI_API_KEY,
+        generationConfig = generationConfig {
+            temperature = 0.1f
+            topK = 1
+            topP = 0.95f
+            responseMimeType = "application/json"
+        },
+        safetySettings = listOf(
+            SafetySetting(HarmCategory.HARASSMENT, BlockThreshold.NONE),
+            SafetySetting(HarmCategory.HATE_SPEECH, BlockThreshold.NONE),
+            SafetySetting(HarmCategory.SEXUALLY_EXPLICIT, BlockThreshold.NONE),
+            SafetySetting(HarmCategory.DANGEROUS_CONTENT, BlockThreshold.NONE)
+        )
+    )
+
     private var capturedBitmap: Bitmap? = null
-    private var schoolName: String = ""
     private var schoolCode: String = ""
-    private var teacherName: String = ""
-    private var className: String = "5A" 
+    private var className: String = "5A"
     private var photoFile: File? = null
     private var photoPath: String? = null
-
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             val fileToLoad = photoFile ?: photoPath?.let { File(it) }
-            fileToLoad?.let { file ->
+            if (fileToLoad != null) {
                 try {
-                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    val bitmap = decodeSampledAndRotatedBitmap(fileToLoad, maxDimension = 3000)
                     if (bitmap != null) {
                         capturedBitmap = bitmap
                         binding.ivAttendancePaper.setImageBitmap(bitmap)
-                        startAutoProcess()
-                    } else {
-                        Toast.makeText(this, "Failed to load image", Toast.LENGTH_SHORT).show()
+                        startGenAIProcess()
                     }
+                    Log.d("ScanActivity", "Camera result processed")
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    Log.e("ScanActivity", "Bitmap error: ${e.message}")
                 }
             }
         }
@@ -69,12 +94,12 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
             photoPath?.let { path -> photoFile = File(path) }
         }
 
-        schoolName = intent.getStringExtra("schoolName") ?: "Govt School"
         schoolCode = intent.getStringExtra("schoolCode") ?: "N/A"
-        teacherName = intent.getStringExtra("teacherName") ?: "Unknown"
         className = intent.getStringExtra("className") ?: "5A"
 
-        binding.btnCapturePaper.setOnClickListener { openCamera() }
+        binding.btnCapturePaper.setOnClickListener {
+            openCamera()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -88,7 +113,7 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
             val file = createImageFile() ?: return
             photoFile = file
             photoPath = file.absolutePath
-            val photoURI = FileProvider.getUriForFile(this, "com.school.attendance.fileprovider", file)
+            val photoURI = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
             intent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
             cameraLauncher.launch(intent)
         } catch (e: Exception) {
@@ -104,257 +129,156 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
         } catch (e: Exception) { null }
     }
 
-    private fun startAutoProcess() {
-        val originalBitmap = capturedBitmap ?: return
-        setLoading(true, "Scanning monthly sheet...")
-        
-        // Use higher resolution for precision grid analysis
-        val maxDimension = 2000 
-        val scale = Math.min(maxDimension.toFloat() / originalBitmap.width, maxDimension.toFloat() / originalBitmap.height).coerceAtMost(1.0f)
-        val bitmap = if (scale < 1.0f) {
-            Bitmap.createScaledBitmap(originalBitmap, (originalBitmap.width * scale).toInt(), (originalBitmap.height * scale).toInt(), true)
-        } else {
-            originalBitmap
+    private fun decodeSampledAndRotatedBitmap(file: File, maxDimension: Int): Bitmap? {
+        val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, boundsOptions)
+        var sampleSize = 1
+        while (boundsOptions.outWidth / (sampleSize * 2) >= maxDimension || boundsOptions.outHeight / (sampleSize * 2) >= maxDimension) { sampleSize *= 2 }
+        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val rawBitmap = BitmapFactory.decodeFile(file.absolutePath, decodeOptions) ?: return null
+        val exif = ExifInterface(file.absolutePath)
+        val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        val rotationDegrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
         }
-        
-        val image = InputImage.fromBitmap(bitmap, 0)
-        recognizer.process(image)
-            .addOnSuccessListener { visionText ->
-                val allElements = visionText.textBlocks.flatMap { it.lines }.flatMap { it.elements }
-                if (allElements.isEmpty()) {
-                    setLoading(false)
-                    Toast.makeText(this, "No text found", Toast.LENGTH_SHORT).show()
-                    return@addOnSuccessListener
-                }
-
-                // 1. Group rows with center-Y logic
-                val rows = mutableListOf<MutableList<com.google.mlkit.vision.text.Text.Element>>()
-                val sortedElements = allElements.sortedBy { it.boundingBox?.top ?: 0 }
-                for (el in sortedElements) {
-                    var added = false
-                    val cy = el.boundingBox?.centerY() ?: 0
-                    val h = el.boundingBox?.height() ?: 20
-                    for (row in rows) {
-                        if (Math.abs(cy - (row[0].boundingBox?.centerY() ?: 0)) < h * 0.4) {
-                            row.add(el)
-                            added = true
-                            break
-                        }
-                    }
-                    if (!added) rows.add(mutableListOf(el))
-                }
-
-                // 2. Detect Date Context
-                val fullText = visionText.text.uppercase()
-                val calendar = java.util.Calendar.getInstance()
-                var sheetYear = calendar.get(java.util.Calendar.YEAR)
-                var sheetMonth = calendar.get(java.util.Calendar.MONTH) + 1
-                
-                val monthNames = listOf("JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER")
-                monthNames.forEachIndexed { index, name -> if (fullText.contains(name)) sheetMonth = index + 1 }
-                Regex("\\b(202[4-9])\\b").find(fullText)?.let { sheetYear = it.value.toInt() }
-
-                val monthPrefix = "$sheetYear-${String.format("%02d", sheetMonth)}-"
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
-                // 3. Grid Anchors (Headers 1-31) - Multi-point interpolation
-                val detectedHeaderDays = mutableMapOf<Int, Int>() 
-                var headerSlope = 0f
-                var headerIdx = -1
-                
-                for ((i, row) in rows.withIndex()) {
-                    val rowNums = row.mapNotNull { it.text.filter { c -> c.isDigit() }.toIntOrNull() }
-                    if (rowNums.contains(1) && rowNums.contains(2) && rowNums.contains(3)) {
-                        headerIdx = i
-                        row.forEach { el ->
-                            val d = el.text.filter { c -> c.isDigit() }.toIntOrNull()
-                            if (d != null && d in 1..31) detectedHeaderDays[d] = el.boundingBox?.centerX() ?: 0
-                        }
-                        
-                        val headerElements = row.filter { detectedHeaderDays.containsKey(it.text.filter { c -> c.isDigit() }.toIntOrNull()) }
-                            .sortedBy { it.boundingBox?.left ?: 0 }
-                        if (headerElements.size >= 2) {
-                            val first = headerElements.first()
-                            val last = headerElements.last()
-                            val dx = (last.boundingBox?.centerX() ?: 0) - (first.boundingBox?.centerX() ?: 0)
-                            val dy = (last.boundingBox?.centerY() ?: 0) - (first.boundingBox?.centerY() ?: 0)
-                            if (dx != 0) headerSlope = dy.toFloat() / dx
-                        }
-                        break
-                    }
-                }
-
-                if (detectedHeaderDays.isEmpty()) {
-                    setLoading(false)
-                    Toast.makeText(this, "Header 1-31 not found", Toast.LENGTH_LONG).show()
-                    return@addOnSuccessListener
-                }
-
-                // Advanced Interpolation for Day Anchors
-                val dayAnchors = mutableMapOf<Int, Int>()
-                val sortedKnownDays = detectedHeaderDays.keys.sorted()
-                for (d in 1..31) {
-                    if (detectedHeaderDays.containsKey(d)) {
-                        dayAnchors[d] = detectedHeaderDays[d]!!
-                    } else {
-                        val prev = sortedKnownDays.filter { it < d }.lastOrNull()
-                        val next = sortedKnownDays.filter { it > d }.firstOrNull()
-                        if (prev != null && next != null) {
-                            val x1 = detectedHeaderDays[prev]!!
-                            val x2 = detectedHeaderDays[next]!!
-                            dayAnchors[d] = x1 + (x2 - x1) * (d - prev) / (next - prev)
-                        } else if (prev != null) {
-                            val x1 = detectedHeaderDays[prev]!!
-                            val gap = if (sortedKnownDays.size > 1) (detectedHeaderDays[sortedKnownDays.last()]!! - detectedHeaderDays[sortedKnownDays.first()]!!) / (sortedKnownDays.last() - sortedKnownDays.first()) else 40
-                            dayAnchors[d] = x1 + gap * (d - prev)
-                        } else {
-                            val x2 = detectedHeaderDays[next!!]!!
-                            val gap = if (sortedKnownDays.size > 1) (detectedHeaderDays[sortedKnownDays.last()]!! - detectedHeaderDays[sortedKnownDays.first()]!!) / (sortedKnownDays.last() - sortedKnownDays.first()) else 40
-                            dayAnchors[d] = x2 - gap * (next - d)
-                        }
-                    }
-                }
-
-                // 4. Extract Student Data
-                val students = mutableListOf<StudentResult>()
-                val day1X = dayAnchors[1] ?: 0
-                val cal = java.util.Calendar.getInstance()
-                cal.set(sheetYear, sheetMonth - 1, 1)
-                val maxDaysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-
-                for (i in headerIdx + 1 until rows.size) {
-                    val row = rows[i].sortedBy { it.boundingBox?.left ?: 0 }
-                    val rollEl = row.find { it.text.filter { c -> c.isDigit() }.length in 1..3 } ?: continue
-                    val roll = rollEl.text.filter { it.isDigit() }.toInt()
-                    if (roll > 100) continue 
-
-                    val nameElements = row.filter { 
-                        val cx = it.boundingBox?.centerX() ?: 0
-                        cx > (rollEl.boundingBox?.right ?: 0) && cx < day1X - 10 
-                    }
-                    val namePart = nameElements.joinToString(" ") { it.text }.trim()
-                    if (namePart.isEmpty() || namePart.contains("YEAR", true)) continue
-
-                    // Calculate Row Context (Adaptive)
-                    val rowTextElements = mutableListOf(rollEl)
-                    rowTextElements.addAll(nameElements)
-                    val ry = rowTextElements.map { it.boundingBox?.centerY() ?: 0 }.average().toInt()
-                    val rx = rollEl.boundingBox?.centerX() ?: 0
-
-                    // Adaptive Thresholding: Sample the "white" paper color near the name
-                    var paperLuma = 200
-                    try {
-                        val sampleX = (rollEl.boundingBox?.right ?: 0) + 5
-                        if (sampleX < bitmap.width) {
-                            val pixel = bitmap.getPixel(sampleX, ry)
-                            paperLuma = ((pixel shr 16 and 0xFF) + (pixel shr 8 and 0xFF) + (pixel and 0xFF)) / 3
-                        }
-                    } catch (e: Exception) {}
-                    val dynamicThreshold = (paperLuma * 0.75).toInt().coerceIn(70, 140)
-
-                    // 5. High-Precision Local Search Dot Detection
-                    val attendance = mutableMapOf<String, Int>()
-                    for (day in 1..31) {
-                        if (day > maxDaysInMonth) continue
-                        val date = "$monthPrefix${String.format("%02d", day)}"
-                        if (date > todayStr) continue 
-
-                        val ax = dayAnchors[day] ?: continue
-                        val targetY = ry + (headerSlope * (ax - rx)).toInt()
-                        
-                        // Refined Contrast-Based Detection
-                        var isPresent = false
-                        try {
-                            // 1. Find Average brightness of the center (10x10)
-                            var centerLumaSum = 0
-                            var centerCount = 0
-                            val cSize = 4
-                            for (dx in -cSize..cSize) {
-                                for (dy in -cSize..cSize) {
-                                    val px = ax + dx
-                                    val py = targetY + dy
-                                    if (px in 0 until bitmap.width && py in 0 until bitmap.height) {
-                                        val p = bitmap.getPixel(px, py)
-                                        centerLumaSum += ((p shr 16 and 0xFF) + (p shr 8 and 0xFF) + (p and 0xFF)) / 3
-                                        centerCount++
-                                    }
-                                }
-                            }
-                            val avgCenterLuma = if (centerCount > 0) centerLumaSum / centerCount else 255
-                            
-                            // 2. Sample corner luma to detect "paper" vs "dot"
-                            var cornerLumaSum = 0
-                            var cornerCount = 0
-                            val cr = 8
-                            val corners = listOf(Pair(-cr, -cr), Pair(cr, -cr), Pair(-cr, cr), Pair(cr, cr))
-                            for (c in corners) {
-                                val px = ax + c.first
-                                val py = targetY + c.second
-                                if (px in 0 until bitmap.width && py in 0 until bitmap.height) {
-                                    val p = bitmap.getPixel(px, py)
-                                    cornerLumaSum += ((p shr 16 and 0xFF) + (p shr 8 and 0xFF) + (p and 0xFF)) / 3
-                                    cornerCount++
-                                }
-                            }
-                            val avgCornerLuma = if (cornerCount > 0) cornerLumaSum / cornerCount else 255
-                            
-                            // A dot has high contrast between center and corners
-                            // And the center must be dark relative to dynamic threshold
-                            if (avgCenterLuma < dynamicThreshold && (avgCornerLuma - avgCenterLuma) > 35) {
-                                isPresent = true
-                            }
-                        } catch (e: Exception) {}
-                        
-                        attendance[date] = if (isPresent) 1 else 0
-                    }
-                    students.add(StudentResult(roll.toString(), namePart, attendance))
-                }
-
-                if (students.isEmpty()) {
-                    setLoading(false)
-                    Toast.makeText(this, "No student rows identified", Toast.LENGTH_SHORT).show()
-                } else {
-                    val futureMsg = if (todayStr.startsWith(monthPrefix)) " (Skipping dates after today)" else ""
-                    binding.tvStatus.text = "Syncing ${students.size} students$futureMsg..."
-                    saveData(students)
-                }
-            }
+        if (rotationDegrees == 0f) return rawBitmap
+        val matrix = Matrix().apply { postRotate(rotationDegrees) }
+        return Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
     }
 
-    private fun saveData(students: List<StudentResult>) {
-        var done = 0
-        students.forEach { s ->
-            val ref = firestore.collection("students").document(s.rollNo)
-            firestore.runTransaction { tx ->
-                val snap = tx.get(ref)
-                @Suppress("UNCHECKED_CAST")
-                val existing = snap.get("attendance") as? Map<String, Any> ?: emptyMap()
-                val updates = mutableMapOf<String, Any>()
-                
-                s.attendance.forEach { (d, status) ->
-                    if (!existing.containsKey(d)) updates["attendance.$d"] = status
+    private fun startGenAIProcess() {
+        val bitmap = capturedBitmap ?: return
+        setLoading(true, "AI is analyzing the sheet... (this may take a moment)")
+
+        lifecycleScope.launch {
+            try {
+                val prompt = content {
+                    image(bitmap)
+                    text("""
+                        Task: Extract school attendance data from this image.
+                        Context: The image is a monthly attendance sheet for a class.
+
+                        Requirements:
+                        1. Identify the Month (as an integer 1-12) and Year (e.g. 2024).
+                        2. For every student row, extract:
+                           - Roll Number (as a string)
+                           - Student Name
+                           - Attendance status for every day of that month (1 for Present, 0 for Absent).
+
+                        Note: Solid black dots, ticks, or '1' represent 'Present' (1). Empty cells or '0' represent 'Absent' (0).
+
+                        Return the data STRICTLY as a JSON object with this structure:
+                        {
+                          "month": 6,
+                          "year": 2026,
+                          "students": [
+                            {
+                              "rollNo": "101",
+                              "name": "Aarav Sharma",
+                              "attendance": {
+                                "2026-06-01": 1,
+                                "2026-06-02": 0
+                              }
+                            }
+                          ]
+                        }
+
+                        Important: Output ONLY the JSON object. Do not include markdown code blocks (```json).
+                    """.trimIndent())
                 }
 
-                if (!snap.exists()) {
-                    tx.set(ref, hashMapOf(
-                        "name" to s.name,
-                        "rollNo" to (s.rollNo.toIntOrNull() ?: 0),
-                        "class" to className,
-                        "schoolCode" to schoolCode,
-                        "attendance" to s.attendance,
-                        "lastUpdated" to System.currentTimeMillis()
-                    ))
-                } else if (updates.isNotEmpty()) {
-                    tx.update(ref, "lastUpdated", System.currentTimeMillis())
-                    updates.forEach { (k, v) -> tx.update(ref, k, v) }
+                val response = withContext(Dispatchers.IO) { generativeModel.generateContent(prompt) }
+                val jsonText = response.text ?: throw Exception("AI response empty")
+
+                Log.d("ScanActivity", "RAW AI Response: $jsonText")
+
+                val students = parseAiResponse(jsonText)
+                setLoading(false)
+
+                if (students.isEmpty()) {
+                    Toast.makeText(this@StudentAttendanceScanActivity, "AI read the sheet but found no records.", Toast.LENGTH_LONG).show()
+                } else {
+                    showConfirmationDialog(students)
                 }
-                null
-            }.addOnCompleteListener {
-                if (++done == students.size) {
-                    setLoading(false)
-                    Toast.makeText(this, "Sync Complete", Toast.LENGTH_LONG).show()
-                    binding.root.postDelayed({ finish() }, 2000)
+
+            } catch (e: Exception) {
+                Log.e("ScanActivity", "GenAI Error", e)
+                setLoading(false)
+                Toast.makeText(this@StudentAttendanceScanActivity, "AI Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun parseAiResponse(jsonString: String): List<StudentResult> {
+        val result = mutableListOf<StudentResult>()
+        try {
+            val start = jsonString.indexOf("{")
+            val end = jsonString.lastIndexOf("}")
+            if (start == -1 || end == -1) return result
+
+            val cleanedJson = jsonString.substring(start, end + 1)
+            val root = JSONObject(cleanedJson)
+            val studentsArray = root.optJSONArray("students") ?: return result
+
+            for (i in 0 until studentsArray.length()) {
+                val sObj = studentsArray.getJSONObject(i)
+                val roll = sObj.optString("rollNo", "")
+                val name = sObj.optString("name", "Unknown")
+                val attObj = sObj.optJSONObject("attendance") ?: JSONObject()
+
+                val attendanceMap = mutableMapOf<String, Int>()
+                val keys = attObj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = attObj.get(key)
+                    attendanceMap[key] = if (value.toString() == "1" || value.toString().lowercase() == "true") 1 else 0
                 }
+                if (roll.isNotEmpty()) result.add(StudentResult(roll, name, attendanceMap))
+            }
+        } catch (e: Exception) {
+            Log.e("ScanActivity", "Parse error: ${e.message}")
+        }
+        return result
+    }
+
+    private fun showConfirmationDialog(students: List<StudentResult>) {
+        AlertDialog.Builder(this)
+            .setTitle("Confirm AI Data")
+            .setMessage("${students.size} students identified. Save to database?")
+            .setPositiveButton("Save") { _, _ -> saveToFirebase(students) }
+            .setNegativeButton("Retake", null)
+            .show()
+    }
+
+    private fun saveToFirebase(students: List<StudentResult>) {
+        setLoading(true, "Syncing...")
+        val batch = firestore.batch()
+        for (s in students) {
+            val ref = firestore.collection("students").document(s.rollNo)
+            val attMap = hashMapOf<String, Any>()
+            s.attendance.forEach { (date, value) -> attMap[date] = value }
+            
+            val data = hashMapOf<String, Any>(
+                "name" to s.name,
+                "rollNo" to (s.rollNo.toIntOrNull() ?: 0),
+                "class" to className,
+                "schoolCode" to schoolCode,
+                "attendance" to attMap,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+            batch.set(ref, data, SetOptions.merge())
+        }
+        batch.commit().addOnCompleteListener { task ->
+            setLoading(false)
+            if (task.isSuccessful) {
+                photoFile?.delete()
+                Toast.makeText(this, "Attendance Saved!", Toast.LENGTH_SHORT).show()
+                finish()
+            } else {
+                Toast.makeText(this, "Failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
