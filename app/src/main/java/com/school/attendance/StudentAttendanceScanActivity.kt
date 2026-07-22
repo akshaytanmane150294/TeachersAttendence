@@ -50,7 +50,7 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
     // Using the Free Tier Gemini API Key
-    private val GEMINI_API_KEY = "AIzaSyDeGg3qyzStwDq3A6ym_gw1oHx0eX90gi4"
+    private val GEMINI_API_KEY = ""
 
     private val generativeModel by lazy {
         GenerativeModel(
