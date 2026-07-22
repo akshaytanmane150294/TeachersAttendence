@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.school.attendance.app-mergeDebugResources-42:/values-watch-v20/values-watch-v20.xml",
+            "outputFile": "com.school.attendance.app-mergeDebugResources-47:/values-watch-v20/values-watch-v20.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\a72a7160727d533784b87d5d44695e6e\\workspace\\transformed\\appcompat-1.7.0\\res\\values-watch-v20\\values-watch-v20.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\0a899af1dcaced4fb9598e3ffb5dcb00\\workspace\\transformed\\appcompat-1.7.0\\res\\values-watch-v20\\values-watch-v20.xml",
                     "from": {
                         "startLines": "2,5,8",
                         "startColumns": "4,4,4",
@@ -23,7 +23,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\fe24a4c14c75c53e169e4f9be8acaa43\\workspace\\transformed\\play-services-auth-21.2.0\\res\\values-watch-v20\\values.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\ff7c8a35504cd00452cbbc1a71a3d0de\\workspace\\transformed\\play-services-auth-21.2.0\\res\\values-watch-v20\\values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11",
                         "startColumns": "0,0,0,0,0,0,0,0",

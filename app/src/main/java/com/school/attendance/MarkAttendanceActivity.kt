@@ -34,9 +34,8 @@ class MarkAttendanceActivity : AppCompatActivity() {
         val className = binding.etClassName.text.toString().trim()
         val date = binding.etDate.text.toString().trim()
         val status = when (binding.chipGroupStatus.checkedChipId) {
-            binding.chipAbsent.id -> "Absent"
-            binding.chipLate.id -> "Late"
-            else -> "Present"
+            binding.chipAbsent.id -> 0
+            else -> 1
         }
 
         if (studentName.isEmpty() || className.isEmpty() || date.isEmpty()) {
@@ -53,11 +52,12 @@ class MarkAttendanceActivity : AppCompatActivity() {
 
         setLoading(true)
         val record = AttendanceRecord(
-            studentName = studentName,
-            className = className,
+            username = studentName,
+            schoolname = className,
             date = date,
             status = status,
-            markedBy = uid
+            markedBy = uid,
+            userId = uid
         )
 
         val docRef = firestore.collection("AttendencTable").document()

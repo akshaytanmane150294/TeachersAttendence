@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.school.attendance.app-mergeDebugResources-42:/values-h480dp-land-v13/values-h480dp-land-v13.xml",
+            "outputFile": "com.school.attendance.app-mergeDebugResources-47:/values-h480dp-land-v13/values-h480dp-land-v13.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\5665bad291eb3708a393b5aaf0d40e10\\workspace\\transformed\\material-1.12.0\\res\\values-h480dp-land-v13\\values-h480dp-land-v13.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\c3f5d27be727fd3fc4f42fc5510b98c9\\workspace\\transformed\\material-1.12.0\\res\\values-h480dp-land-v13\\values-h480dp-land-v13.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10",
                         "startColumns": "4,4,4,4,4,4,4,4,4",
