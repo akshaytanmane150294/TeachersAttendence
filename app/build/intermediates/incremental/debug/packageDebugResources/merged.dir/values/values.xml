@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#FF6D00</color>
+    <color name="background">#F5F6FA</color>
+    <color name="card_border">#E0E0E0</color>
+    <color name="error">#D32F2F</color>
+    <color name="field_bg">#D1D9FF</color>
+    <color name="primary">#1A237E</color>
+    <color name="primary_dark">#0D1454</color>
+    <color name="success">#2E7D32</color>
+    <color name="text_primary">#1C1C1E</color>
+    <color name="text_secondary">#6E6E73</color>
+    <color name="white">#FFFFFF</color>
+    <string name="app_name">Govt School Attendance</string>
+    <string name="back_to_login">Back to Login</string>
+    <string name="btn_login">Login</string>
+    <string name="btn_register">Register</string>
+    <string name="btn_send_reset">Send Reset Link</string>
+    <string name="city_hint">City</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+    <string name="dashboard_title">Welcome, Teacher</string>
+    <string name="district_hint">District</string>
+    <string name="email_hint">Email</string>
+    <string name="employee_id_hint">Employee ID</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="forgot_subtitle">Enter your registered email. We will send a password reset link.</string>
+    <string name="forgot_title">Reset Password</string>
+    <string name="full_name_hint">Full Name</string>
+    <string name="gcm_defaultSenderId" translatable="false">576243984805</string>
+    <string name="google_api_key" translatable="false">AIzaSyAF5qgPPoE-Gz1gRjOsCBWlaWknSq1zN7c</string>
+    <string name="google_app_id" translatable="false">1:576243984805:android:623751802e88783370204c</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyAF5qgPPoE-Gz1gRjOsCBWlaWknSq1zN7c</string>
+    <string name="google_storage_bucket" translatable="false">schoolattendance-3aea1.firebasestorage.app</string>
+    <string name="have_account">Already have an account? Login</string>
+    <string name="login_subtitle">Sign in to mark attendance</string>
+    <string name="login_title">Teacher Login</string>
+    <string name="logout">Logout</string>
+    <string name="mark_attendance">Mark Attendance</string>
+    <string name="my_profile">My Profile</string>
+    <string name="no_account">Don\'t have an account? Register</string>
+    <string name="password_hint">Password</string>
+    <string name="project_id" translatable="false">schoolattendance-3aea1</string>
+    <string name="register_title">Teacher Registration</string>
+    <string name="state_hint">State</string>
+    <string name="subject_hint">Subject Taught</string>
+    <style name="Theme.SchoolAttendance" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+    </style>
+</resources>

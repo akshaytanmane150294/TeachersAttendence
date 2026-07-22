@@ -16,6 +16,7 @@
     </queries>
 
     <application
+        android:name=".SchoolAttendanceApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -39,6 +40,10 @@
         <activity android:name=".MarkAttendanceActivity" android:exported="false" />
         <activity android:name=".MarkTeacherAttendanceActivity" android:exported="false" />
         <activity android:name=".StudentAttendanceScanActivity" android:exported="false" />
+
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

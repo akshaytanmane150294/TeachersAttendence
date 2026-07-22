@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.school.attendance.app-mergeDebugResources-42:/values-en-rXC/values-en-rXC.xml",
+            "outputFile": "com.school.attendance.app-mergeDebugResources-48:/values-en-rXC/values-en-rXC.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\a72a7160727d533784b87d5d44695e6e\\workspace\\transformed\\appcompat-1.7.0\\res\\values-en-rXC\\values-en-rXC.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\0a899af1dcaced4fb9598e3ffb5dcb00\\workspace\\transformed\\appcompat-1.7.0\\res\\values-en-rXC\\values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -21,7 +21,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\610602a497948d625988470f8f3f47a1\\workspace\\transformed\\credentials-1.2.0-rc01\\res\\values-en-rXC\\values-en-rXC.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\091756fde35a0b2ef66a6e1278c8bfce\\workspace\\transformed\\credentials-1.2.0-rc01\\res\\values-en-rXC\\values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3",
                         "startColumns": "4,4",
@@ -38,7 +38,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\df7a413ebbf689623897bb3b74cf01c8\\workspace\\transformed\\core-1.13.1\\res\\values-en-rXC\\values-en-rXC.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\d1af7179074588fb8fe895f26bbb950b\\workspace\\transformed\\core-1.13.1\\res\\values-en-rXC\\values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -55,7 +55,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\5449dee7ce9e961fbf854d7bb6843ccd\\workspace\\transformed\\browser-1.4.0\\res\\values-en-rXC\\values-en-rXC.xml",
+                    "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\dddd4cadd353ab4411760936ad3afc2d\\workspace\\transformed\\browser-1.4.0\\res\\values-en-rXC\\values-en-rXC.xml",
                     "from": {
                         "startLines": "2,3,4,5",
                         "startColumns": "4,4,4,4",

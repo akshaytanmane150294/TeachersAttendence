@@ -1,114 +1,106 @@
 [
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xxhdpi_ic_launcher.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xxhdpi\\ic_launcher.webp"
+        "merged": "com.school.attendance.app-debug-50:/drawable_ic_camera_placeholder.xml.flat",
+        "source": "com.school.attendance.app-main-52:/drawable/ic_camera_placeholder.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable_ic_camera.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\drawable\\ic_camera.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xhdpi_ic_launcher_round.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xhdpi/ic_launcher_round.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_mark_teacher_attendance.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_mark_teacher_attendance.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-mdpi_ic_launcher.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-mdpi/ic_launcher.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_login.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_login.xml"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_register.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_register.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_student_attendance_scan.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_student_attendance_scan.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xxxhdpi_ic_launcher.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xxxhdpi/ic_launcher.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_register.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_register.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xxhdpi_ic_launcher_round.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xxhdpi/ic_launcher_round.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_item_student.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\item_student.xml"
+        "merged": "com.school.attendance.app-debug-50:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.school.attendance.app-main-52:/drawable/ic_launcher_background.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_dashboard.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_dashboard.xml"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_mark_attendance.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_mark_attendance.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable_ic_launcher_background.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\drawable\\ic_launcher_background.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
-        "merged": "com.school.attendance.app-debug-44:/xml_file_paths.xml.flat",
-        "source": "com.school.attendance.app-main-46:/xml/file_paths.xml"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_dashboard.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_dashboard.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable_ic_camera_placeholder.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\drawable\\ic_camera_placeholder.xml"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_forgot_password.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_forgot_password.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xhdpi_ic_launcher_round.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xhdpi\\ic_launcher_round.webp"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_mark_teacher_attendance.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_mark_teacher_attendance.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-anydpi-v26\\ic_launcher.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xxxhdpi_ic_launcher_round.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xxxhdpi/ic_launcher_round.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xxxhdpi_ic_launcher_round.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xxxhdpi\\ic_launcher_round.webp"
+        "merged": "com.school.attendance.app-debug-50:/layout_item_student.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/item_student.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xhdpi_ic_launcher.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xhdpi\\ic_launcher.webp"
+        "merged": "com.school.attendance.app-debug-50:/drawable_ic_school.xml.flat",
+        "source": "com.school.attendance.app-main-52:/drawable/ic_school.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-hdpi_ic_launcher.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-hdpi\\ic_launcher.webp"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-hdpi_ic_launcher.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-hdpi/ic_launcher.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xxhdpi_ic_launcher_round.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xxhdpi\\ic_launcher_round.webp"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xhdpi_ic_launcher.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xhdpi/ic_launcher.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\xml_file_paths.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\xml\\file_paths.xml"
+        "merged": "com.school.attendance.app-debug-50:/drawable_ic_camera.xml.flat",
+        "source": "com.school.attendance.app-main-52:/drawable/ic_camera.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-mdpi_ic_launcher.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-mdpi\\ic_launcher.webp"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-xxhdpi_ic_launcher.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-xxhdpi/ic_launcher.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_mark_attendance.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_mark_attendance.xml"
+        "merged": "com.school.attendance.app-debug-50:/xml_file_paths.xml.flat",
+        "source": "com.school.attendance.app-main-52:/xml/file_paths.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-xxxhdpi_ic_launcher.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-xxxhdpi\\ic_launcher.webp"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_student_attendance_scan.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_student_attendance_scan.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable_ic_school.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\drawable\\ic_school.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-hdpi_ic_launcher_round.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-hdpi/ic_launcher_round.webp"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable-anydpi-v24_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-pngs-39:\\drawable-anydpi-v24\\ic_launcher_foreground.xml"
+        "merged": "com.school.attendance.app-debug-50:/layout_activity_login.xml.flat",
+        "source": "com.school.attendance.app-main-52:/layout/activity_login.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\layout_activity_forgot_password.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\layout\\activity_forgot_password.xml"
+        "merged": "com.school.attendance.app-debug-50:/drawable-v24_ic_launcher_foreground.xml.flat",
+        "source": "com.school.attendance.app-main-52:/drawable-v24/ic_launcher_foreground.xml"
     },
     {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-hdpi_ic_launcher_round.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-hdpi\\ic_launcher_round.webp"
-    },
-    {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\mipmap-mdpi_ic_launcher_round.webp.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\mipmap-mdpi\\ic_launcher_round.webp"
-    },
-    {
-        "merged": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-debug-44:\\drawable-v24_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\aksha\\.gradle\\daemon\\9.3.0\\com.school.attendance.app-main-46:\\drawable-v24\\ic_launcher_foreground.xml"
+        "merged": "com.school.attendance.app-debug-50:/mipmap-mdpi_ic_launcher_round.webp.flat",
+        "source": "com.school.attendance.app-main-52:/mipmap-mdpi/ic_launcher_round.webp"
     }
 ]
