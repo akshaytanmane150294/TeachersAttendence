@@ -30,12 +30,17 @@ class AttendanceAdapter(
 
     class ViewHolder(private val binding: ItemStudentBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(record: AttendanceRecord) {
-            binding.tvStudentName.text = record.studentName
-            binding.tvClassDate.text = "${record.className} • ${record.date}"
-            binding.chipStatus.text = record.status
+            binding.tvStudentName.text = record.username.ifBlank { "Unknown" }
+            binding.tvClassDate.text = "${record.schoolname.ifBlank { "School" }} • ${record.date}"
+            val statusLabel = when (record.status) {
+                1 -> "Present"
+                0 -> "Absent"
+                else -> "Late"
+            }
+            binding.chipStatus.text = statusLabel
             val color = when (record.status) {
-                "Present" -> Color.parseColor("#2E7D32")
-                "Absent" -> Color.parseColor("#D32F2F")
+                1 -> Color.parseColor("#2E7D32")
+                0 -> Color.parseColor("#D32F2F")
                 else -> Color.parseColor("#F9A825")
             }
             binding.chipStatus.chipBackgroundColor = android.content.res.ColorStateList.valueOf(color)
