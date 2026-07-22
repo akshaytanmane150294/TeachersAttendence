@@ -61,18 +61,20 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
-    implementation("com.google.firebase:firebase-ai")
+    // Use standard Google AI SDK (Free Tier) instead of Vertex AI to avoid billing
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
-    // App Check is now enforced by default for Firebase AI Logic / Gemini calls.
-    // Debug provider lets local/dev builds pass App Check without full attestation.
-    // For release builds you'll eventually want firebase-appcheck-playintegrity instead.
     implementation("com.google.firebase:firebase-appcheck-debug")
 
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+
+    // Explicitly adding Ktor dependencies to resolve NoClassDefFoundError
+    implementation("io.ktor:ktor-client-android:2.3.12")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

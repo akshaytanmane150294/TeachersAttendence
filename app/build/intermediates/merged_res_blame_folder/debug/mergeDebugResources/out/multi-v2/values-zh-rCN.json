@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.school.attendance.app-mergeDebugResources-48:/values-zh-rCN/values-zh-rCN.xml",
+            "outputFile": "com.school.attendance.app-mergeDebugResources-47:/values-zh-rCN/values-zh-rCN.xml",
             "map": [
                 {
                     "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\0a899af1dcaced4fb9598e3ffb5dcb00\\workspace\\transformed\\appcompat-1.7.0\\res\\values-zh-rCN\\values-zh-rCN.xml",

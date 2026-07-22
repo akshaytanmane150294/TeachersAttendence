@@ -68,12 +68,15 @@ class MarkTeacherAttendanceActivity : AppCompatActivity() {
         }
 
         binding.btnStudentAttendance.setOnClickListener {
-            val intent = Intent(this, StudentAttendanceScanActivity::class.java)
-            teacher?.let {
-                intent.putExtra("schoolName", it.schoolName)
-                intent.putExtra("schoolCode", it.schoolCode)
-                intent.putExtra("teacherName", it.fullName)
+            if (teacher == null) {
+                Toast.makeText(this, "Please wait, loading profile...", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+            val intent = Intent(this, StudentAttendanceScanActivity::class.java)
+            intent.putExtra("schoolName", teacher?.schoolName)
+            intent.putExtra("schoolCode", teacher?.schoolCode)
+            intent.putExtra("teacherName", teacher?.fullName)
+            intent.putExtra("className", "5A")
             startActivity(intent)
         }
 
