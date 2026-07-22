@@ -10,13 +10,14 @@ class SchoolAttendanceApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Must run before any Firestore/Gemini call anywhere in the app.
+        // Firebase initialization
         Firebase.initialize(context = this)
+        
+        // Temporarily disabled App Check to fix SecurityException/DEVELOPER_ERROR
+        /*
         Firebase.appCheck.installAppCheckProviderFactory(
             DebugAppCheckProviderFactory.getInstance()
         )
-        // NOTE: DebugAppCheckProviderFactory is for development only.
-        // Before you publish a release build, switch this to
-        // PlayIntegrityAppCheckProviderFactory.getInstance() instead.
+        */
     }
 }

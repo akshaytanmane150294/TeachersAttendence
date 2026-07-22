@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.school.attendance.app-mergeDebugResources-48:/values-ru/values-ru.xml",
+            "outputFile": "com.school.attendance.app-mergeDebugResources-47:/values-ru/values-ru.xml",
             "map": [
                 {
                     "source": "C:\\Users\\aksha\\.gradle\\caches\\9.3.0\\transforms\\0a899af1dcaced4fb9598e3ffb5dcb00\\workspace\\transformed\\appcompat-1.7.0\\res\\values-ru\\values-ru.xml",
