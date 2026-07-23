@@ -22,6 +22,15 @@ local.properties
 
 # Firebase & AI (IMPORTANT: DO NOT SHARE THESE)
 app/google-services.json
+
+# Firebase
+google-services.json
+*.keystore
+
+# API keys
+local.properties
+.env
+
 # If you have local API keys in a file
 **/secrets.xml
 **/keys.properties

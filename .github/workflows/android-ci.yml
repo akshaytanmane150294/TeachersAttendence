@@ -21,17 +21,20 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Create Google Services Placeholder
-        # This prevents the build from failing due to the missing ignored file
-        run: echo "{}" > app/google-services.json
+      - name: Decode Google Services JSON
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Run Unit Tests
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew test
 
       - name: Build Debug APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew assembleDebug
 
       - name: Upload Artifact (APK)
