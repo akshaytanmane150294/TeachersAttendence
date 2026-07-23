@@ -1,90 +1,55 @@
-# School Teacher Attendance App (Android / Kotlin)
+# School Teacher & Student Attendance App (Android / Kotlin)
 
-Production-ready teacher attendance app with:
-- Login (Firebase Authentication)
-- Register (with **real email verification**)
-- Forgot Password (real **email reset link** — no custom SMTP needed, more secure)
-- Dashboard with attendance history
-- Mark Attendance (Firestore backed)
+A production-ready Android application for schools to manage both Teacher and Student attendance. It features Firebase authentication, Firestore database, and **Gemini 1.5 Pro AI** integration for scanning physical attendance sheets.
 
-Firebase Authentication is used instead of a custom SMTP server because embedding
-email/SMTP credentials inside an Android APK is insecure and can be extracted by
-anyone. Firebase sends real emails (verification + password reset) from its own
-trusted mail servers — this is the standard production approach used by real apps.
+## 🚀 Key Features
 
-## 1. Firebase Project Setup (required — do this first)
+- **Teacher Management**: Secure registration with real email verification and password reset via Firebase.
+- **Teacher Attendance**: Mark attendance with real-time location (GPS) and photo capture.
+- **AI Student Scanner**: Scan physical attendance sheets using Gemini 1.5 Pro. Automatically extracts student names, roll numbers, and daily attendance status with high precision.
+- **Dynamic Dashboard**: View attendance history and manage profiles.
+- **Real-time Sync**: All data is synced instantly with Firebase Firestore.
 
-1. Go to https://console.firebase.google.com → **Add Project** → name it (e.g. `SchoolAttendance`).
-2. Inside the project, click **Add App → Android**.
-   - Package name: `com.school.attendance` (must match exactly)
-3. Download the generated **`google-services.json`** file.
-4. Copy it into: `app/google-services.json` (same folder as `app/build.gradle.kts`).
-   - This file is NOT included in this project — you must generate your own from your Firebase console.
-5. In Firebase Console → **Build → Authentication → Sign-in method** → Enable **Email/Password**.
-6. In Firebase Console → **Build → Firestore Database** → Create database (start in production mode).
-7. Under Firestore → **Rules**, paste:
+## 🛠 Tech Stack
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /teachers/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-    match /attendance/{docId} {
-      allow read: if request.auth != null && resource.data.markedBy == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.markedBy == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.markedBy == request.auth.uid;
-    }
-  }
-}
-```
+- **Language**: Kotlin
+- **Architecture**: MVVM / Jetpack (ViewBinding, Lifecycle, Coroutines)
+- **Database**: Firebase Firestore
+- **Authentication**: Firebase Auth
+- **AI/ML**: Google Gemini 1.5 Pro (Generative AI SDK)
+- **Networking**: Ktor Client
+- **UI**: Material Components (Day/Night support)
 
-8. (Optional, recommended) In Authentication → Templates, customize the "Email address verification"
-   and "Password reset" email templates with your school's name/logo.
+## 📋 Prerequisites & Setup
 
-## 2. Open & Run
+### 1. Firebase Setup
+1. Create a project at [Firebase Console](https://console.firebase.google.com/).
+2. Add an Android App with package name `com.school.attendance`.
+3. Download `google-services.json` and place it in the `app/` directory.
+4. Enable **Email/Password** in Authentication.
+5. Create a **Firestore Database** and **Firebase Storage** bucket.
 
-1. Open this folder in **Android Studio** (Hedgehog or newer).
-2. Let Gradle sync (it will download dependencies — needs internet).
-3. Make sure `app/google-services.json` is in place (step above).
-4. Run on an emulator or physical device (minSdk 23 / Android 6.0+).
+### 2. Google AI Setup
+1. Get an API Key from [Google AI Studio](https://aistudio.google.com/).
+2. Open `StudentAttendanceScanActivity.kt` and paste your key in the `GEMINI_API_KEY` field.
 
-## 3. App Flow
+### 3. Build the Project
+1. Open the project in **Android Studio** (Hedgehog or newer).
+2. Click **Sync Project with Gradle Files**.
+3. Run the app on a physical device (recommended for Camera/GPS testing).
 
-- First launch → `SplashActivity` checks if a teacher is already logged in.
-- Not logged in → `LoginActivity`
-  - "Register" → `RegisterActivity` → creates Firebase account → sends real
-    verification email → teacher profile saved to Firestore `teachers/{uid}`.
-  - "Forgot Password" → `ForgotPasswordActivity` → sends real password reset
-    email via `sendPasswordResetEmail()`.
-- After login (and only if email is verified) → `DashboardActivity`
-  - Shows teacher name/subject and recent attendance list (from Firestore `attendance` collection).
-  - "Mark Attendance" → `MarkAttendanceActivity` → saves a record with
-    student name, class, date, and status (Present/Absent/Late).
-  - "Logout" → signs out and returns to Login.
+## 📂 Project Structure
 
-## 4. Project Structure
+- `com.school.attendance/`
+  - `activities/`: Splash, Login, Register, Dashboard, etc.
+  - `models/`: Data classes for Teacher and Attendance.
+  - `adapters/`: RecyclerView adapters for history lists.
+- `StudentAttendanceScanActivity.kt`: The core AI engine for processing attendance sheets.
+- `MarkTeacherAttendanceActivity.kt`: Handles GPS location and teacher selfie capture.
 
-```
-app/src/main/java/com/school/attendance/
-  SplashActivity.kt
-  LoginActivity.kt
-  RegisterActivity.kt
-  ForgotPasswordActivity.kt
-  DashboardActivity.kt
-  MarkAttendanceActivity.kt
-  models/Teacher.kt
-  models/AttendanceRecord.kt
-  adapters/AttendanceAdapter.kt
-app/src/main/res/layout/   -> all XML screens
-app/src/main/res/values/   -> strings, colors, themes
-```
+## 🛡 Security Notes
+- **App Check**: Temporarily disabled in `SchoolAttendanceApplication.kt` for development. Enable it before release for enhanced security.
+- **ProGuard**: Minification is enabled for release builds to protect the source code.
 
-## 5. Notes for Production Hardening
-
-- Add Firebase App Check to block abuse from non-genuine app installs.
-- Add a Cloud Function to auto-delete unverified accounts after 24h.
-- Consider adding school-admin role management (Firestore custom claims) if
-  multiple schools/admins will use one app.
-- Add ProGuard/R8 (`isMinifyEnabled = true`) is already enabled for release builds.
+---
+Developed with ❤️ for Schools.

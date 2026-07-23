@@ -1,0 +1,34 @@
+# Built objects
+bin/
+gen/
+out/
+build/
+
+# Gradle
+.gradle/
+gradlew
+gradlew.bat
+gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Firebase & AI (IMPORTANT: DO NOT SHARE THESE)
+app/google-services.json
+# If you have local API keys in a file
+**/secrets.xml
+**/keys.properties
+
+# OS related
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
