@@ -28,7 +28,7 @@ google-services.json
 *.keystore
 
 # API keys
-local.properties
+.local.properties
 .env
 
 # If you have local API keys in a file
