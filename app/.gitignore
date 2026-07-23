@@ -1,0 +1,5 @@
+# Module specific build folder
+/build/
+
+# Do not ignore google-services.json here if you want it in Git
+# (BUT it is recommended to keep it ignored in the root .gitignore)
