@@ -6,19 +6,26 @@ import android.util.Patterns
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.school.attendance.databinding.ActivityLoginBinding
+import com.school.attendance.network.ApiClient
+import com.school.attendance.network.AuthManager
+import org.json.JSONObject
+import java.io.IOException
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
-    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
+        // Auto-redirect if already logged in
+        if (AuthManager.isLoggedIn()) {
+            startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
+            finish()
+            return
+        }
+
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -50,31 +57,35 @@ class LoginActivity : AppCompatActivity() {
         if (!isValid) return
 
         setLoading(true)
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                setLoading(false)
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    if (user != null && !user.isEmailVerified) {
-                        Toast.makeText(
-                            this,
-                            "Please verify your email before logging in. Check your inbox.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        auth.signOut()
-                        return@addOnCompleteListener
+
+        Thread {
+            try {
+                val body = JSONObject().apply {
+                    put("email", email)
+                    put("password", password)
+                }
+                val response = ApiClient.post("/auth/login", body)
+                val respStr = response.body?.string() ?: ""
+                runOnUiThread {
+                    setLoading(false)
+                    if (response.isSuccessful) {
+                        val json = JSONObject(respStr)
+                        val token = json.getString("token")
+                        AuthManager.saveToken(token)
+                        startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
+                        finish()
+                    } else {
+                        val msg = try { JSONObject(respStr).getString("detail") } catch (e: Exception) { "Login failed" }
+                        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
                     }
-                    startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
-                    finish()
-                } else {
-                    val message = when (task.exception) {
-                        is FirebaseAuthInvalidUserException -> "No account found with this email"
-                        is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password"
-                        else -> task.exception?.localizedMessage ?: "Login failed. Try again."
-                    }
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    setLoading(false)
+                    Toast.makeText(this, "Connection failed: ${e.localizedMessage ?: e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }.start()
     }
 
     private fun setLoading(loading: Boolean) {

@@ -22,6 +22,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.SchoolAttendance">
 
         <activity
@@ -33,13 +34,14 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".LoginActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".LoginActivity" android:exported="true" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".RegisterActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ForgotPasswordActivity" android:exported="false" />
-        <activity android:name=".DashboardActivity" android:exported="false" />
+        <activity android:name=".DashboardActivity" android:exported="true" />
         <activity android:name=".MarkAttendanceActivity" android:exported="false" />
         <activity android:name=".MarkTeacherAttendanceActivity" android:exported="false" />
-        <activity android:name=".StudentAttendanceScanActivity" android:exported="false" />
+        <activity android:name=".StudentAttendanceScanActivity" android:exported="true" />
+        <activity android:name=".AttendanceSheetEditorActivity" android:exported="true" />
 
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"

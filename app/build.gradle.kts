@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.school.attendance"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -21,6 +20,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
@@ -54,27 +54,30 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
-    // Firebase - ONE BOM only, controls versions for every Firebase artifact below.
-    // Bumped to a current version (also covers Auth, Firestore, Storage, and AI).
-    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    // OkHttp (for Python API communication)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
-    // Use standard Google AI SDK (Free Tier) instead of Vertex AI to avoid billing
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    // JWT decode for client-side token parsing
+    implementation("com.auth0.android:jwtdecode:2.0.2")
 
-    implementation("com.google.firebase:firebase-appcheck-debug")
-
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // Google Services & ML Kit (Local OCR)
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+    
+    // Image Handling
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
-    // Explicitly adding Ktor dependencies to resolve NoClassDefFoundError
-    implementation("io.ktor:ktor-client-android:2.3.12")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+    // CameraX
+    val camerax_version = "1.3.4"
+    implementation("androidx.camera:camera-core:$camerax_version")
+    implementation("androidx.camera:camera-camera2:$camerax_version")
+    implementation("androidx.camera:camera-lifecycle:$camerax_version")
+    implementation("androidx.camera:camera-view:$camerax_version")
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.3.0")
+    implementation("com.google.guava:guava:33.2.1-android")
+
+    // OpenCV
+    implementation("com.quickbirdstudios:opencv:4.5.3.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

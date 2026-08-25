@@ -1,53 +1,49 @@
-package com.school.attendance
+﻿package com.school.attendance
 
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import com.school.attendance.adapters.AttendanceAdapter
 import com.school.attendance.databinding.ActivityDashboardBinding
 import com.school.attendance.models.AttendanceRecord
-import com.school.attendance.models.Teacher
+import com.school.attendance.network.ApiClient
+import com.school.attendance.network.AuthManager
+import org.json.JSONObject
+import java.io.IOException
 
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDashboardBinding
-    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
-    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
     private val adapter = AttendanceAdapter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityDashboardBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
+        if (!AuthManager.isLoggedIn()) {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
             return
         }
 
+        binding = ActivityDashboardBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
         binding.rvAttendance.layoutManager = LinearLayoutManager(this)
         binding.rvAttendance.adapter = adapter
 
-        loadTeacherProfile(uid)
-        loadAttendance(uid)
+        loadTeacherProfile()
+        loadAttendance()
 
-        binding.swipeRefresh.setOnRefreshListener {
-            loadAttendance(uid)
-        }
+        binding.swipeRefresh.setOnRefreshListener { loadAttendance() }
 
         binding.cardMarkAttendance.setOnClickListener {
             startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
         }
 
         binding.cardLogout.setOnClickListener {
-            auth.signOut()
+            AuthManager.clearToken()
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
@@ -55,46 +51,70 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        auth.currentUser?.uid?.let { loadAttendance(it) }
+        loadAttendance()
     }
 
-    private fun loadTeacherProfile(uid: String) {
-        firestore.collection("Teachers").document(uid).get()
-            .addOnSuccessListener { doc ->
-                if (doc.exists()) {
-                    val teacher = doc.toObject(Teacher::class.java)
-                    if (teacher != null) {
-                        binding.tvWelcome.text = "Welcome, ${teacher.fullName}"
-                        binding.tvTeacherSubject.text = "ID: ${teacher.employeeId}\n${teacher.city}, ${teacher.district}, ${teacher.state}"
+    private fun loadTeacherProfile() {
+        Thread {
+            try {
+                val response = ApiClient.get("/auth/me", withAuth = true)
+                val respStr = response.body?.string() ?: ""
+                runOnUiThread {
+                    if (response.isSuccessful) {
+                        val json = JSONObject(respStr)
+                        val name       = json.optString("full_name", "Teacher")
+                        val empId      = json.optString("employee_id", "")
+                        val city       = json.optString("city", "")
+                        val district   = json.optString("district", "")
+                        val state      = json.optString("state", "")
+                        binding.tvWelcome.text = "Welcome, $name"
+                        binding.tvTeacherSubject.text = "ID: $empId\n$city, $district, $state"
+                    } else {
+                        binding.tvWelcome.text = "Welcome"
                     }
-                } else {
-                    binding.tvWelcome.text = "Profile not found in 'Teachers'"
                 }
+            } catch (e: IOException) {
+                runOnUiThread { binding.tvWelcome.text = "Server offline" }
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Profile load error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            }
+        }.start()
     }
 
-    private fun loadAttendance(uid: String) {
+    private fun loadAttendance() {
         binding.swipeRefresh.isRefreshing = true
-        firestore.collection("AttendencTable")
-            .whereEqualTo("teacherId", uid)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
-            .limit(50)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                binding.swipeRefresh.isRefreshing = false
-                val records = snapshot.documents.mapNotNull { doc ->
-                    val record = doc.toObject(AttendanceRecord::class.java)
-                    // Map from AttendencTable fields if necessary or adjust model
-                    record
+        Thread {
+            try {
+                val response = ApiClient.get("/attendance/history", withAuth = true)
+                val respStr = response.body?.string() ?: ""
+                runOnUiThread {
+                    binding.swipeRefresh.isRefreshing = false
+                    if (response.isSuccessful) {
+                        val json = JSONObject(respStr)
+                        val arr = json.getJSONArray("records")
+                        val records = mutableListOf<AttendanceRecord>()
+                        for (i in 0 until arr.length()) {
+                            val r = arr.getJSONObject(i)
+                            records.add(AttendanceRecord(
+                                id       = r.optInt("id").toString(),
+                                username = r.optString("username", ""),
+                                schoolname = r.optString("school_name", ""),
+                                schoolcode = r.optString("school_code", ""),
+                                date     = r.optString("date", ""),
+                                status   = r.optInt("status", 1),
+                                timestamp = r.optLong("timestamp", 0),
+                                userId   = r.optString("user_id", "")
+                            ))
+                        }
+                        adapter.submitList(records)
+                    } else {
+                        Toast.makeText(this, "Failed to load attendance history", Toast.LENGTH_SHORT).show()
+                    }
                 }
-                adapter.submitList(records)
+            } catch (e: IOException) {
+                runOnUiThread {
+                    binding.swipeRefresh.isRefreshing = false
+                    Toast.makeText(this, "Cannot connect to server", Toast.LENGTH_SHORT).show()
+                }
             }
-            .addOnFailureListener { e ->
-                binding.swipeRefresh.isRefreshing = false
-                Toast.makeText(this, "Failed to load attendance: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            }
+        }.start()
     }
 }

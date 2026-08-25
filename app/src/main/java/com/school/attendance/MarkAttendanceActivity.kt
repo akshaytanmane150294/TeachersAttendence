@@ -4,18 +4,16 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.school.attendance.databinding.ActivityMarkAttendanceBinding
 import com.school.attendance.models.AttendanceRecord
+import com.school.attendance.network.ApiClient
+import com.school.attendance.network.AuthManager
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 class MarkAttendanceActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMarkAttendanceBinding
-    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
-    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +41,7 @@ class MarkAttendanceActivity : AppCompatActivity() {
             return
         }
 
-        val uid = auth.currentUser?.uid
+        val uid = AuthManager.getUserId()
         if (uid == null) {
             Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_SHORT).show()
             finish()
@@ -51,28 +49,28 @@ class MarkAttendanceActivity : AppCompatActivity() {
         }
 
         setLoading(true)
-        val record = AttendanceRecord(
-            username = studentName,
-            schoolname = className,
-            date = date,
-            status = status,
-            markedBy = uid,
-            userId = uid
-        )
-
-        val docRef = firestore.collection("AttendencTable").document()
-        record.id = docRef.id
-
-        docRef.set(record)
-            .addOnSuccessListener {
-                setLoading(false)
-                Toast.makeText(this, "Attendance saved", Toast.LENGTH_SHORT).show()
-                finish()
+        // Post to server
+        Thread {
+            try {
+                val body = org.json.JSONObject().apply {
+                    put("student_name", studentName)
+                    put("class_name", className)
+                    put("date", date)
+                    put("status", status)
+                }
+                val response = ApiClient.post("/attendance/mark", body, withAuth = true)
+                runOnUiThread {
+                    setLoading(false)
+                    Toast.makeText(this, "Attendance saved", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    setLoading(false)
+                    Toast.makeText(this, "Failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
             }
-            .addOnFailureListener { e ->
-                setLoading(false)
-                Toast.makeText(this, "Failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-            }
+        }.start()
     }
 
     private fun setLoading(loading: Boolean) {
