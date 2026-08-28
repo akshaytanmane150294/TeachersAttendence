@@ -134,12 +134,95 @@
             android:textStyle="normal" />
     </LinearLayout>
 
+    <!-- Camera Specs HUD Banner (Resolution 1635x1184, Ratio 1.38:1, Distance 25-30cm) -->
+    <LinearLayout
+        android:id="@+id/layoutCameraSpecs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_condition_chip_yellow"
+        android:backgroundTint="#80000000"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layoutGuidancePill">
+
+        <TextView
+            android:id="@+id/tvCameraSpecs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📷 1635×1184 (1.38:1)  •  📏 25-30cm  •  📐 0° Flat"
+            android:textColor="#E0E0E0"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Live Condition Indicators Bar (Light, Framing, Angle/Distance, Stability) -->
+    <LinearLayout
+        android:id="@+id/layoutLiveConditions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:layout_marginBottom="12dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomShutterArea"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/chipLight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_condition_chip_yellow"
+            android:text="💡 Light: ..."
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="4dp" />
+
+        <TextView
+            android:id="@+id/chipFraming"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_condition_chip_yellow"
+            android:text="🔵 Frame: 1.38:1"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="4dp" />
+
+        <TextView
+            android:id="@+id/chipAngle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_condition_chip_green"
+            android:text="📐 Tilt: 0° Flat"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="4dp" />
+
+        <TextView
+            android:id="@+id/chipStability"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_condition_chip_yellow"
+            android:text="🎯 Hold: Steady"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <!-- Shutter & Controls Bottom Area -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/bottomShutterArea"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="40dp"
+        android:paddingBottom="36dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <!-- Modern Shutter Button (Outer Ring + Inner Button) -->

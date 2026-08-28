@@ -21,7 +21,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class StudentAttendanceScanActivity : AppCompatActivity() {
+class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.SensorEventListener {
 
     private lateinit var binding: ActivityStudentAttendanceScanBinding
 
@@ -35,6 +35,17 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
     private var className: String = "5A"
     private var scanYear: Int = 0
     private var scanMonth: Int = 0
+
+    // Sensor Manager for Tilt Angle
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var accelerometer: android.hardware.Sensor? = null
+    private var currentTiltAngle: Float = 0f
+
+    // Live Condition State
+    private var isReadyToCapture: Boolean = false
+    private var lastLumaCheckTime: Long = 0L
+    private var lastAvgLuminance: Float = 128f
+    private var lastGuidanceState: String = ""
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -64,6 +75,10 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
+        // Init Accelerometer for 0° Flat Tilt Check
+        sensorManager = getSystemService(SENSOR_SERVICE) as? android.hardware.SensorManager
+        accelerometer = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+
         if (allPermissionsGranted()) {
             startCamera()
         } else {
@@ -79,6 +94,32 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
         binding.btnReset.setOnClickListener { resetUI() }
     }
 
+    override fun onResume() {
+        super.onResume()
+        accelerometer?.let {
+            sensorManager?.registerListener(this, it, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager?.unregisterListener(this)
+    }
+
+    override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+        if (event == null || event.sensor.type != android.hardware.Sensor.TYPE_ACCELEROMETER) return
+        val x = event.values[0]
+        val y = event.values[1]
+        val z = event.values[2]
+        val gTotal = kotlin.math.sqrt((x * x + y * y + z * z).toDouble())
+        if (gTotal > 0) {
+            val cosTilt = (kotlin.math.abs(z) / gTotal).coerceIn(0.0, 1.0)
+            currentTiltAngle = Math.toDegrees(kotlin.math.acos(cosTilt)).toFloat()
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+
     private fun allPermissionsGranted() =
         ContextCompat.checkSelfPermission(baseContext, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
@@ -93,13 +134,24 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .build()
 
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor) { imageProxy ->
+                        analyzeLiveFrame(imageProxy)
+                    }
+                }
+
             try {
                 cameraProvider.unbindAll()
                 camera = cameraProvider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
-                    imageCapture
+                    imageCapture,
+                    imageAnalyzer
                 )
                 binding.scannerOverlay.setScanningActive(true)
             } catch (exc: Exception) {
@@ -107,6 +159,133 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
                 Toast.makeText(this, "Failed to start camera: ${exc.message}", Toast.LENGTH_SHORT).show()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    /**
+     * Real-time Camera Preview Frame Analyzer:
+     * 1. Light Level (50% - 79% is optimal green)
+     * 2. Framing / Paper Contrast (Sheet inside frame with text/grid detected)
+     * 3. Tilt Angle (0° Flat parallel to paper)
+     * 4. Stability (No rapid motion/shake)
+     */
+    private fun analyzeLiveFrame(image: ImageProxy) {
+        val now = System.currentTimeMillis()
+        if (now - lastLumaCheckTime < 180) {
+            image.close()
+            return
+        }
+        lastLumaCheckTime = now
+
+        try {
+            val buffer = image.planes[0].buffer
+            val remaining = buffer.remaining()
+            val step = maxOf(1, remaining / 2048)
+            var sum = 0L
+            var count = 0
+            var minVal = 255
+            var maxVal = 0
+
+            var idx = 0
+            while (idx < remaining) {
+                val v = buffer.get(idx).toInt() and 0xFF
+                sum += v
+                if (v < minVal) minVal = v
+                if (v > maxVal) maxVal = v
+                count++
+                idx += step
+            }
+
+            val avgLuminance = if (count > 0) sum / count.toFloat() else 128f
+            val lightPct = ((avgLuminance / 255f) * 100f).toInt().coerceIn(0, 100)
+            val contrast = maxVal - minVal
+            val diffLuma = kotlin.math.abs(avgLuminance - lastAvgLuminance)
+            lastAvgLuminance = avgLuminance
+
+            // Optimal Light: 50% - 79% (acceptable 45% - 85%)
+            val isLightOk = lightPct in 45..85
+            val isFramingOk = lightPct >= 42 && contrast >= 30
+            val isTiltOk = currentTiltAngle <= 15f
+            val isSteady = diffLuma <= 6.5f
+            val isAllReady = isLightOk && isFramingOk && isTiltOk && isSteady
+
+            runOnUiThread {
+                updateConditionUI(isAllReady, isLightOk, isFramingOk, isTiltOk, isSteady, lightPct)
+            }
+        } catch (e: Exception) {
+            Log.e("ScanActivity", "Live Analysis Error", e)
+        } finally {
+            image.close()
+        }
+    }
+
+    private fun updateConditionUI(
+        allReady: Boolean,
+        lightOk: Boolean,
+        framingOk: Boolean,
+        tiltOk: Boolean,
+        steady: Boolean,
+        lightPct: Int
+    ) {
+        isReadyToCapture = allReady
+
+        // 1. Light Chip (Target: 50% - 79%)
+        if (lightOk) {
+            binding.chipLight.setBackgroundResource(R.drawable.bg_condition_chip_green)
+            binding.chipLight.text = "💡 Light: ${lightPct}%"
+        } else if (lightPct < 45) {
+            binding.chipLight.setBackgroundResource(R.drawable.bg_condition_chip_red)
+            binding.chipLight.text = "💡 Light: ${lightPct}% (Low)"
+        } else {
+            binding.chipLight.setBackgroundResource(R.drawable.bg_condition_chip_yellow)
+            binding.chipLight.text = "💡 Light: ${lightPct}% (High)"
+        }
+
+        // 2. Table Boundary Alignment Chip (1.38:1)
+        if (framingOk) {
+            binding.chipFraming.setBackgroundResource(R.drawable.bg_condition_chip_green)
+            binding.chipFraming.text = "🔵 Frame: 1.38:1"
+        } else {
+            binding.chipFraming.setBackgroundResource(R.drawable.bg_condition_chip_yellow)
+            binding.chipFraming.text = "🔵 Sheet: Align"
+        }
+
+        // 3. Tilt Angle Chip (0° Flat)
+        val angleDeg = currentTiltAngle.toInt()
+        if (tiltOk) {
+            binding.chipAngle.setBackgroundResource(R.drawable.bg_condition_chip_green)
+            binding.chipAngle.text = "📐 Tilt: ${angleDeg}° Flat"
+        } else {
+            binding.chipAngle.setBackgroundResource(R.drawable.bg_condition_chip_yellow)
+            binding.chipAngle.text = "📐 Tilt: ${angleDeg}° (Level)"
+        }
+
+        // 4. Stability Chip
+        if (steady) {
+            binding.chipStability.setBackgroundResource(R.drawable.bg_condition_chip_green)
+            binding.chipStability.text = "🎯 Hold: Steady"
+        } else {
+            binding.chipStability.setBackgroundResource(R.drawable.bg_condition_chip_yellow)
+            binding.chipStability.text = "🎯 Hold: Moving..."
+        }
+
+        // 5. Update Overlay Glow & Colors
+        binding.scannerOverlay.setScannerState(allReady, framingOk, lightOk)
+
+        // 6. Update Status Pill
+        if (allReady) {
+            binding.tvStatus.text = "✨ Perfect! Tap Capture Button"
+            binding.layoutGuidancePill.setBackgroundColor(Color.parseColor("#E6003B1E"))
+            binding.btnCaptureContainer.alpha = 1.0f
+        } else {
+            binding.layoutGuidancePill.setBackgroundResource(R.drawable.bg_scanner_pill)
+            binding.btnCaptureContainer.alpha = 0.75f
+            when {
+                !lightOk && lightPct < 45 -> binding.tvStatus.text = "Low Light (${lightPct}%): Turn on Flash or increase light"
+                !tiltOk -> binding.tvStatus.text = "Hold phone flat (0° parallel to paper, 25-30cm)"
+                !framingOk -> binding.tvStatus.text = "Align table corners inside 1.38:1 blue guide box"
+                !steady -> binding.tvStatus.text = "Hold camera steady..."
+            }
+        }
     }
 
     private fun toggleTorch() {
@@ -128,6 +307,20 @@ class StudentAttendanceScanActivity : AppCompatActivity() {
 
     private fun takePhoto() {
         val imageCapture = imageCapture ?: return
+
+        // If not ready, warn the user so bad photos are prevented
+        if (!isReadyToCapture) {
+            binding.btnCaptureContainer.animate()
+                .translationXBy(15f).setDuration(60)
+                .withEndAction {
+                    binding.btnCaptureContainer.animate().translationXBy(-30f).setDuration(60)
+                        .withEndAction {
+                            binding.btnCaptureContainer.animate().translationX(0f).setDuration(60).start()
+                        }.start()
+                }.start()
+            Toast.makeText(this, "⚠️ Please align table inside frame and ensure all green indicators are ON!", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         // Trigger visual feedback (green corner pulse + button bounce)
         binding.scannerOverlay.triggerCaptureFeedback()

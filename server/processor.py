@@ -16,7 +16,7 @@ rapid_engine = RapidOCR()
 
 @dataclass
 class AttendanceConfig:
-    min_ink_ratio: float = 0.10
+    min_ink_ratio: float = 0.05
     standard_width: int = 2000
     standard_height: int = 1400
 
@@ -134,112 +134,153 @@ class ProductionAttendanceProcessor:
         if cell.size == 0:
             return 0
         ch, cw = cell.shape[:2]
-        cy1, cy2 = max(1, int(ch * 0.15)), min(ch - 1, int(ch * 0.85))
-        cx1, cx2 = max(1, int(cw * 0.15)), min(cw - 1, int(cw * 0.85))
-        center = cell[cy1:cy2, cx1:cx2]
-        if center.size == 0:
+        # Exact 20% margin from Top, Bottom, Left, and Right (detecting inside the 60% center core)
+        cy1, cy2 = int(ch * 0.20), int(ch * 0.80)
+        cx1, cx2 = int(cw * 0.20), int(cw * 0.80)
+        core = cell[cy1:cy2, cx1:cx2]
+        if core.size == 0:
             return 0
 
-        c_gray = cv2.cvtColor(center, cv2.COLOR_BGR2GRAY) if len(center.shape) == 3 else center
-        c_bin = cv2.threshold(c_gray, 130, 255, cv2.THRESH_BINARY_INV)[1]
-        dark_pixels = cv2.countNonZero(c_bin)
-        total_pixels = center.shape[0] * center.shape[1]
-        dark_ratio = dark_pixels / float(max(1, total_pixels))
+        c_gray = cv2.cvtColor(core, cv2.COLOR_BGR2GRAY) if len(core.shape) == 3 else core
+        bg = np.percentile(c_gray, 85)
+        min_val = np.min(c_gray)
+        diff = bg - min_val
+        dark_ratio = np.sum(c_gray < (bg - 35)) / float(c_gray.size)
 
-        return 1 if dark_ratio >= self.config.min_ink_ratio else 0
+        # Empty-First Check: If contrast is low or dark pixels are sparse -> Absent (0), else Present (1)
+        is_empty = (diff < 50) or (dark_ratio < 0.08)
+        return 0 if is_empty else 1
 
     def process_image(self, image: np.ndarray) -> Dict[str, Any]:
         # 1. Warp Table Grid
         warped_table = self._rectify_table_grid(image)
 
-        # 2. Extract ONLY Horizontal Coordinates (y_lines)
+        # 2. Extract Dynamic Horizontal Coordinates (y_lines) & Vertical Coordinates (x_lines)
         gray_p = cv2.cvtColor(warped_table, cv2.COLOR_BGR2GRAY)
         bin_p = cv2.adaptiveThreshold(gray_p, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 5)
 
-        h_proj = np.sum(cv2.morphologyEx(bin_p, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (100, 1))) > 0, axis=1)
-        h_peaks = np.where(h_proj > 400)[0]
-        raw_y_lines = self._merge_peaks(h_peaks, min_gap=10)
+        # A. Horizontal Line Peaks (Project exclusively in Day Grid 350..1850 to avoid text interference)
+        h_w = cv2.morphologyEx(bin_p, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (60, 1)))
+        h_proj = np.sum(h_w[:, 350:1850] > 0, axis=1)
+        h_peaks = np.where(h_proj > 350)[0]
+        raw_y_lines = self._merge_peaks(h_peaks, min_gap=12)
 
-        # Build clean row intervals, dynamically splitting any merged/oversized rows
-        raw_gaps = [raw_y_lines[i + 1] - raw_y_lines[i] for i in range(len(raw_y_lines) - 1)]
-        valid_gaps = [g for g in raw_gaps if 30 <= g <= 75]
-        median_h = float(np.median(valid_gaps)) if valid_gaps else 52.0
+        # B. Vertical Line Peaks (Real Printed Column Lines)
+        v_w = cv2.morphologyEx(bin_p, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, 60)))
+        v_proj = np.sum(v_w[100:1350, :] > 0, axis=0)
+        v_peaks = np.where(v_proj > 200)[0]
+        raw_x_lines = self._merge_peaks(v_peaks, min_gap=8)
 
-        row_intervals = []
-        for r in range(len(raw_y_lines) - 1):
-            y1, y2 = raw_y_lines[r], raw_y_lines[r + 1]
-            h_row = y2 - y1
-            num_sub_rows = max(1, int(round(h_row / median_h)))
-            step = h_row / float(num_sub_rows)
-            for sub in range(num_sub_rows):
-                sub_y1 = int(round(y1 + sub * step))
-                sub_y2 = int(round(y1 + (sub + 1) * step))
-                if (sub_y2 - sub_y1) >= 15:
-                    row_intervals.append((sub_y1, sub_y2))
+        # Exact Mapping of 25 Student Rows (raw_y[1:]) and 31 Day Columns (raw_x[2:34])
+        if len(raw_y_lines) >= 26:
+            row_lines = raw_y_lines[1:27]
+        else:
+            row_lines = [int(round(99 + r * 51.88)) for r in range(26)]
 
-        # First interval is Table Header, remaining intervals are student rows (up to 25)
-        student_intervals = row_intervals[1:] if len(row_intervals) > 1 else row_intervals
+        student_intervals = [(row_lines[r], row_lines[r + 1]) for r in range(len(row_lines) - 1)]
 
-        # Fixed Horizontal Column Proportions
-        roll_x1, roll_x2 = 4, 110
-        name_x1, name_x2 = 110, 338
-        day_start, day_end = 338, 1874
-        day_w = (day_end - day_start) / 31.0
-        day_x = [int(day_start + d * day_w) for d in range(32)]
+        # Dynamic Day Columns (Day 1 to 31)
+        if len(raw_x_lines) >= 35:
+            day_cols = raw_x_lines[2:34]
+        else:
+            day_cols = [int(round(345 + d * 48.9)) for d in range(32)]
+
+        roll_x1 = raw_x_lines[0] if raw_x_lines else 13
+        roll_x2 = raw_x_lines[1] if len(raw_x_lines) > 1 else 124
+        name_x1 = roll_x2
+        name_x2 = day_cols[0] if day_cols else 345
+        day_end = day_cols[-1]
+
+        # Dynamic Month Detection via Header OCR
+        header_crop = warped_table[0:student_intervals[0][0], :] if student_intervals else warped_table[0:100, :]
+        res_header, _ = rapid_engine(header_crop) if header_crop.size > 0 else (None, None)
+        header_text = " ".join([b[1] for b in res_header]).upper() if res_header else ""
+
+        days_count = 31
+        if any(m in header_text for m in ["JUNE", "APRIL", "SEPTEMBER", "NOVEMBER", "JUN", "APR", "SEP", "NOV"]):
+            days_count = 30
+        elif "FEBRUARY" in header_text or "FEB" in header_text:
+            days_count = 28
 
         annotated = warped_table.copy()
 
-        # Draw grid lines for visualization
-        for (y1, y2) in student_intervals:
-            cv2.line(annotated, (0, y1), (annotated.shape[1], y1), (0, 0, 255), 1)
-        if student_intervals:
-            cv2.line(annotated, (0, student_intervals[-1][1]), (annotated.shape[1], student_intervals[-1][1]), (0, 0, 255), 1)
-
-        cv2.line(annotated, (roll_x1, 0), (roll_x1, annotated.shape[0]), (0, 255, 0), 1)
-        cv2.line(annotated, (name_x1, 0), (name_x1, annotated.shape[0]), (0, 255, 0), 1)
-        cv2.line(annotated, (name_x2, 0), (name_x2, annotated.shape[0]), (0, 255, 0), 1)
-        for dx in day_x:
-            cv2.line(annotated, (dx, 0), (dx, annotated.shape[0]), (0, 255, 0), 1)
+        # Clean Table Bounding Box (Blue Outer Border on exact table black lines)
+        table_top_y = raw_y_lines[0] if raw_y_lines else (max(0, student_intervals[0][0] - 52) if student_intervals else 0)
+        table_bottom_y = raw_y_lines[-1] if raw_y_lines else (student_intervals[-1][1] if student_intervals else 1380)
+        table_left_x = raw_x_lines[0] if raw_x_lines else 4
+        table_right_x = raw_x_lines[-1] if len(raw_x_lines) > 2 else 1988
+        cv2.rectangle(annotated, (table_left_x, table_top_y), (table_right_x, table_bottom_y), (255, 0, 0), 2)
 
         records = []
 
-        # 3. Pure Row-Wise Loop on each student row
-        for idx, (y1, y2) in enumerate(student_intervals[:25]):
+        # 3. Pure Row-Wise & Column-Wise Loop using Exact Line Coordinates
+        for idx, (Y_top, Y_bottom) in enumerate(student_intervals[:25]):
+            delta_Y = Y_bottom - Y_top
+
             # A. Extract Roll Number in this row
-            roll_crop = warped_table[y1 + 2:y2 - 2, roll_x1:roll_x2]
+            roll_crop = warped_table[Y_top + 2:Y_bottom - 2, roll_x1:roll_x2]
             roll_pad = cv2.copyMakeBorder(roll_crop, 15, 15, 15, 15, cv2.BORDER_CONSTANT, value=(255, 255, 255)) if roll_crop.size > 0 else None
             res_roll, _ = rapid_engine(roll_pad) if roll_pad is not None else (None, None)
             roll_str = "".join(filter(str.isdigit, " ".join([b[1] for b in res_roll]))) if res_roll else ""
 
             # B. Extract Student Name in this row
-            name_crop = warped_table[y1 + 2:y2 - 2, name_x1:name_x2]
+            name_crop = warped_table[Y_top + 2:Y_bottom - 2, name_x1:name_x2]
             name_pad = cv2.copyMakeBorder(name_crop, 15, 15, 15, 15, cv2.BORDER_CONSTANT, value=(255, 255, 255)) if name_crop.size > 0 else None
             res_name, _ = rapid_engine(name_pad) if name_pad is not None else (None, None)
             name_raw = " ".join([b[1] for b in res_name]).strip() if res_name else ""
             clean_name = " ".join(["".join(filter(str.isalpha, w)).capitalize() for w in name_raw.split() if len(w) > 1])
 
-            # C. In SAME ROW, loop 31 Day Cells: 0 = Empty, 1 = Black Circle/Mark
+            # C. Check each Day Cell between Vertical Lines X_d and X_d+1 with 20% margin from lines
             marks = []
-            for d in range(31):
-                dx1, dx2 = day_x[d], day_x[d + 1]
-                c_crop = warped_table[y1:y2, dx1:dx2]
-                is_marked = self._detect_black_circle_dot(c_crop)
+            for d in range(min(31, len(day_cols) - 1)):
+                X_left, X_right = day_cols[d], day_cols[d + 1]
+                delta_X = X_right - X_left
+
+                # Exact 20% distance from horizontal & vertical lines:
+                y1 = int(round(Y_top + 0.20 * delta_Y))
+                y2 = int(round(Y_bottom - 0.20 * delta_Y))
+                x1 = int(round(X_left + 0.20 * delta_X))
+                x2 = int(round(X_right - 0.20 * delta_X))
+
+                core = warped_table[y1:y2, x1:x2]
+                
+                # Check for 400-Pixel Black Circle Dot in Core (Adaptive Ink Density)
+                if core.size == 0:
+                    is_marked = 0
+                else:
+                    c_gray = cv2.cvtColor(core, cv2.COLOR_BGR2GRAY) if len(core.shape) == 3 else core
+                    bg = np.percentile(c_gray, 85)
+                    min_val = np.min(c_gray)
+                    diff = bg - min_val
+
+                    # Count dark ink pixels (pixels significantly darker than paper background)
+                    # A 400-pixel black circle occupies 150-400 pixels inside the 20% core box
+                    ink_pixels = np.sum(c_gray < (bg - 30))
+
+                    # Circle Detection: True marked circle (dark or light/faded) has >= 100 ink pixels & diff >= 45
+                    # Empty cell with shadow/watermark has diff < 20 and ink_pixels = 0
+                    is_marked = 1 if (ink_pixels >= 100 and diff >= 45) else 0
+
                 marks.append(is_marked)
 
-                cx, cy = int((dx1 + dx2) / 2), int((y1 + y2) / 2)
+                # Centroid of the cell for clean visual dot
+                cx = int(round((X_left + X_right) / 2.0))
+                cy = int(round((Y_top + Y_bottom) / 2.0))
                 if is_marked == 1:
                     cv2.circle(annotated, (cx, cy), 4, (0, 200, 0), -1)  # Green filled dot (1/P)
                 else:
-                    cv2.circle(annotated, (cx, cy), 2, (0, 0, 255), 1)   # Red circle (0/A)
+                    cv2.circle(annotated, (cx, cy), 2, (0, 0, 255), -1)  # Red small dot (0/A)
 
-            p_count = sum(marks)
-            a_count = 31 - p_count
+            # Calculate Active Month Days Present / Absent
+            active_marks = marks[:days_count]
+            p_count = sum(active_marks)
+            a_count = days_count - p_count
 
             roll_display = str(101 + idx)
             name_display = clean_name if clean_name else f"Student {roll_display}"
 
             if clean_name:
-                cv2.putText(annotated, clean_name, (name_x1 + 5, y2 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 0, 255), 1)
+                cv2.putText(annotated, clean_name, (name_x1 + 5, Y_bottom - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 0, 255), 1)
 
             records.append({
                 "roll_no": roll_display,
@@ -252,7 +293,7 @@ class ProductionAttendanceProcessor:
         # Coordinates DataFrames
         y_lines_all = [s[0] for s in student_intervals] + ([student_intervals[-1][1]] if student_intervals else [])
         y_df = pd.DataFrame({"Horizontal_Line_Index": range(len(y_lines_all)), "Y_Position": y_lines_all})
-        x_df = pd.DataFrame({"Vertical_Line_Index": range(len(day_x) + 3), "X_Position": [roll_x1, roll_x2, name_x2] + day_x})
+        x_df = pd.DataFrame({"Vertical_Line_Index": range(len(day_cols) + 3), "X_Position": [roll_x1, roll_x2, name_x2] + day_cols})
         table_info = pd.DataFrame([{
             "Table_Left": roll_x1,
             "Table_Right": day_end,
@@ -261,13 +302,13 @@ class ProductionAttendanceProcessor:
             "Table_Width": day_end - roll_x1,
             "Table_Height": (student_intervals[-1][1] - student_intervals[0][0]) if student_intervals else 1400,
             "Horizontal_Lines": len(student_intervals) + 1,
-            "Vertical_Lines": len(day_x) + 3
+            "Vertical_Lines": len(day_cols) + 3
         }])
 
         return {
             "status": "success",
             "total_students": len(records),
-            "days_count": 31,
+            "days_count": days_count,
             "data": records,
             "debug_image": annotated,
             "horizontal_lines_df": y_df,

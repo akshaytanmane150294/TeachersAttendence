@@ -490,9 +490,10 @@ async def process_attendance(image: UploadFile = File(...)):
         if img is None:
             raise HTTPException(status_code=400, detail="Invalid image file.")
 
-        raw_scan_path = OUTPUT_DIR / f"raw_scan_{timestamp}.jpg"
-        cv2.imwrite(str(raw_scan_path), img)
-        logger.info(f"Saved raw upload image: {raw_scan_path.resolve()}")
+        # [COMMENTED OUT] Raw scan saving
+        # raw_scan_path = OUTPUT_DIR / f"raw_scan_{timestamp}.jpg"
+        # cv2.imwrite(str(raw_scan_path), img)
+        # logger.info(f"Saved raw upload image: {raw_scan_path.resolve()}")
 
         import importlib
         import processor as proc_module
@@ -501,29 +502,28 @@ async def process_attendance(image: UploadFile = File(...)):
         result = active_processor.process_image(img)
         records = result.get("data", [])
 
-        # Save annotated debug image
+        # Save annotated debug image (Only debug_latest.png)
         if "debug_image" in result and result["debug_image"] is not None:
             debug_img = result.pop("debug_image")
-            debug_path = OUTPUT_DIR / f"debug_attendance_{timestamp}.png"
+            # debug_path = OUTPUT_DIR / f"debug_attendance_{timestamp}.png"
             latest_debug = OUTPUT_DIR / "debug_latest.png"
-            cv2.imwrite(str(debug_path), debug_img)
+            # cv2.imwrite(str(debug_path), debug_img)
             cv2.imwrite(str(latest_debug), debug_img)
-            logger.info(f"Saved annotated debug image to: {debug_path.resolve()}")
+            logger.info(f"Saved annotated debug image to: {latest_debug.resolve()}")
 
-        # Save coordinate DataFrames to CSV
+        # [COMMENTED OUT] Coordinate DataFrames to CSV
         y_df = result.pop("horizontal_lines_df", None)
         x_df = result.pop("vertical_lines_df", None)
         table_info = result.pop("table_info_df", None)
-
-        if y_df is not None:
-            y_df.to_csv(OUTPUT_DIR / f"detected_horizontal_lines_{timestamp}.csv", index=False)
-            y_df.to_csv(OUTPUT_DIR / "detected_horizontal_lines.csv", index=False)
-        if x_df is not None:
-            x_df.to_csv(OUTPUT_DIR / f"detected_vertical_lines_{timestamp}.csv", index=False)
-            x_df.to_csv(OUTPUT_DIR / "detected_vertical_lines.csv", index=False)
-        if table_info is not None:
-            table_info.to_csv(OUTPUT_DIR / f"table_detection_info_{timestamp}.csv", index=False)
-            table_info.to_csv(OUTPUT_DIR / "table_detection_info.csv", index=False)
+        # if y_df is not None:
+        #     y_df.to_csv(OUTPUT_DIR / f"detected_horizontal_lines_{timestamp}.csv", index=False)
+        #     y_df.to_csv(OUTPUT_DIR / "detected_horizontal_lines.csv", index=False)
+        # if x_df is not None:
+        #     x_df.to_csv(OUTPUT_DIR / f"detected_vertical_lines_{timestamp}.csv", index=False)
+        #     x_df.to_csv(OUTPUT_DIR / "detected_vertical_lines.csv", index=False)
+        # if table_info is not None:
+        #     table_info.to_csv(OUTPUT_DIR / f"table_detection_info_{timestamp}.csv", index=False)
+        #     table_info.to_csv(OUTPUT_DIR / "table_detection_info.csv", index=False)
 
         # Build clean Pandas DataFrame for console display & CSV saving
         table_rows = []
@@ -547,20 +547,21 @@ async def process_attendance(image: UploadFile = File(...)):
         print(df.to_string(index=False))
         print("=" * 80 + "\n")
 
-        # Save to timestamped output files
+        # Save ONLY CSV output
         csv_path = OUTPUT_DIR / f"attendance_{timestamp}.csv"
-        json_path = OUTPUT_DIR / f"attendance_{timestamp}.json"
         latest_csv = OUTPUT_DIR / "attendance_latest.csv"
-        latest_json = OUTPUT_DIR / "attendance_latest.json"
-
         df.to_csv(csv_path, index=False)
         df.to_csv(latest_csv, index=False)
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-        with open(latest_json, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Created scan files:\n  1. CSV: {csv_path.resolve()}\n  2. JSON: {json_path.resolve()}")
+        # [COMMENTED OUT] JSON files
+        # json_path = OUTPUT_DIR / f"attendance_{timestamp}.json"
+        # latest_json = OUTPUT_DIR / "attendance_latest.json"
+        # with open(json_path, "w", encoding="utf-8") as f:
+        #     json.dump(result, f, indent=2, ensure_ascii=False)
+        # with open(latest_json, "w", encoding="utf-8") as f:
+        #     json.dump(result, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Created scan CSV: {latest_csv.resolve()}")
         logger.info(f"Returning {len(records)} students to Android app.")
 
         return result

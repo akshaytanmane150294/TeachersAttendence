@@ -44,17 +44,29 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     }
 
     private val frameBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4DFFFFFF") // subtle semi-transparent border
+        color = Color.parseColor("#2979FF") // Electric Blue Table Boundary
         style = Paint.Style.STROKE
-        strokeWidth = frameStrokeWidth
+        strokeWidth = 2.5f * density
     }
 
     private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#00E5FF") // Vibrant Cyan/Neon
+        color = Color.parseColor("#2979FF") // Blue Corners
         style = Paint.Style.STROKE
         strokeWidth = cornerStrokeWidth
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
+    }
+
+    private val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#CC1A237E") // Dark Blue Pill
+        style = Paint.Style.FILL
+    }
+
+    private val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 11f * density
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
     }
 
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -65,7 +77,7 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     }
 
     private val laserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#00E5FF")
+        color = Color.parseColor("#2979FF")
         strokeWidth = 2.5f * density
         style = Paint.Style.STROKE
     }
@@ -73,6 +85,11 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     private val laserTrailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
+
+    // Scanner Status
+    private var isTableReady = false
+    private var isFramingValid = false
+    private var isLightValid = false
 
     // Laser Animation
     private var laserProgress = 0f
@@ -138,20 +155,40 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
         canvas.drawRoundRect(frameRect, cornerRadius, cornerRadius, clearPaint)
 
-        // 2. Draw subtle guide outline
+        // 2. Draw Table Guide Boundary (Blue #2979FF when aligning, Emerald Green #00E676 when ready)
         canvas.drawRoundRect(frameRect, cornerRadius, cornerRadius, frameBorderPaint)
 
-        // 3. Draw subtle alignment grid lines (attendance table rows & columns hint)
+        // 3. Draw Top Table Guide Badge Tag attached to top-left of the blue box
+        drawTableGuideBadge(canvas)
+
+        // 4. Draw subtle alignment grid lines (attendance table rows & columns hint)
         drawTableGridGuides(canvas)
 
-        // 4. Draw bold L-shaped corner brackets (CamScanner / Google Drive style)
+        // 5. Draw bold L-shaped corner brackets (CamScanner / Google Drive style)
         val activeCornerPaint = if (isFlashActive) flashPaint else cornerPaint
         drawCornerBrackets(canvas, activeCornerPaint)
 
-        // 5. Draw animated laser scanning beam if scanning is active
+        // 6. Draw animated laser scanning beam if scanning is active
         if (isScanning && !isFlashActive) {
             drawLaserBeam(canvas)
         }
+    }
+
+    private fun drawTableGuideBadge(canvas: Canvas) {
+        val badgeText = if (isTableReady) "✓ TABLE 100% ALIGNED" else "🔵 ALIGN ATTENDANCE TABLE"
+        val badgeW = badgeTextPaint.measureText(badgeText) + 24f * density
+        val badgeH = 22f * density
+        val badgeL = frameRect.left + 12f * density
+        val badgeT = frameRect.top - badgeH / 2f
+        val badgeR = badgeL + badgeW
+        val badgeB = badgeT + badgeH
+        val badgeRect = RectF(badgeL, badgeT, badgeR, badgeB)
+
+        badgeBgPaint.color = if (isTableReady) Color.parseColor("#E6004D25") else Color.parseColor("#E60D1B4D")
+        canvas.drawRoundRect(badgeRect, 11f * density, 11f * density, badgeBgPaint)
+
+        val textY = badgeT + badgeH / 2f - (badgeTextPaint.descent() + badgeTextPaint.ascent()) / 2f
+        canvas.drawText(badgeText, badgeL + badgeW / 2f, textY, badgeTextPaint)
     }
 
     private fun drawTableGridGuides(canvas: Canvas) {
@@ -230,9 +267,10 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
         // Draw laser trail gradient (glowing aura behind the laser)
         val trailHeight = 24f * density
         val trailTop = (laserY - trailHeight).coerceAtLeast(frameRect.top)
+        val laserGlowColor = if (isTableReady) "#4000E676" else "#402979FF"
         val trailShader = LinearGradient(
             0f, trailTop, 0f, laserY,
-            Color.TRANSPARENT, Color.parseColor("#4000E5FF"),
+            Color.TRANSPARENT, Color.parseColor(laserGlowColor),
             Shader.TileMode.CLAMP
         )
         laserTrailPaint.shader = trailShader
@@ -240,6 +278,30 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
 
         // Draw sharp laser line
         canvas.drawLine(left, laserY, right, laserY, laserPaint)
+    }
+
+    /**
+     * Updates the scanner border & corner colors based on live camera conditions:
+     * - isReady = true -> Vibrant Emerald Green (#00E676)
+     * - isReady = false -> Electric Blue (#2979FF)
+     */
+    fun setScannerState(isReady: Boolean, hasFraming: Boolean, hasLight: Boolean) {
+        isTableReady = isReady
+        isFramingValid = hasFraming
+        isLightValid = hasLight
+
+        val targetColor = when {
+            isReady -> Color.parseColor("#00E676") // Emerald Green (Ready)
+            !hasFraming -> Color.parseColor("#2979FF") // Electric Blue (Aligning)
+            !hasLight -> Color.parseColor("#FFD600") // Low light yellow
+            else -> Color.parseColor("#2979FF") // Electric Blue Table Guide
+        }
+        val targetFrameColor = if (isReady) Color.parseColor("#E600E676") else Color.parseColor("#CC2979FF")
+        
+        cornerPaint.color = targetColor
+        laserPaint.color = targetColor
+        frameBorderPaint.color = targetFrameColor
+        invalidate()
     }
 
     /**

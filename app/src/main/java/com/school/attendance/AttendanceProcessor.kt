@@ -188,9 +188,9 @@ class AttendanceProcessor {
             Log.i("ATTENDANCE_STEP", "📤 Uploading ${sizeKb} KB...")
 
             val client = OkHttpClient.Builder()
-                .connectTimeout(6, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .build()
 
             val requestBody = MultipartBody.Builder()
