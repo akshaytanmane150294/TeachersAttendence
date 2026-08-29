@@ -360,8 +360,8 @@ class AttendanceProcessor {
                 val bh = rect.height
                 val area = Imgproc.contourArea(c)
                 val aspect = if (bh > 0) bw.toDouble() / bh else 0.0
-                // User rule: Diameter 22-26px, Radius 11.5-12.5px
-                if (bw in 18..30 && bh in 18..30 && aspect in 0.70..1.35 && area in 220.0..700.0) {
+                // User rule: Diameter 20-35px, Radius 10-17.5px (R in 11..15px)
+                if (bw in 18..35 && bh in 18..35 && aspect in 0.65..1.40 && area in 200.0..950.0) {
                     val cx = rect.x + bw / 2.0
                     val cy = rect.y + bh / 2.0
                     if (cx in 330.0..1880.0 && cy in 80.0..1440.0) {
@@ -415,7 +415,7 @@ class AttendanceProcessor {
             val grayBytes = ByteArray(width * height)
             gray.get(0, 0, grayBytes)
 
-            val R = 12 // User rule: Radius 11.5 - 12.5px (Diameter 22 - 26px)
+            val R = 13 // User rule: Radius R = 11 to 15px (Diameter 22 to 34px)
             val totalStudents = rowCenters.size
             val numDays = minOf(31, colCenters.size)
             val finalResults = mutableListOf<Map<String, Any>>()
@@ -431,7 +431,7 @@ class AttendanceProcessor {
                     val cx = colCenters[d]
                     val cxInt = Math.round(cx).toInt()
 
-                    // Sample local paper background in cell margin outside R (distance 15 to 21 px)
+                    // Sample local paper background in cell margin outside R (distance 16 to 22 px)
                     val bgSamples = ArrayList<Int>(32)
                     for (dy in -20..20 step 4) {
                         val py = ryInt + dy
@@ -440,7 +440,7 @@ class AttendanceProcessor {
                             val px = cxInt + dx
                             if (px < 0 || px >= width) continue
                             val dSq = dx * dx + dy * dy
-                            if (dSq in (15 * 15)..(21 * 21)) {
+                            if (dSq in (16 * 16)..(22 * 22)) {
                                 bgSamples.add(grayBytes[py * width + px].toInt() and 0xFF)
                             }
                         }
@@ -452,7 +452,7 @@ class AttendanceProcessor {
                         220.0
                     }
 
-                    // Sample circular disk of radius R = 12 px (Diameter 22-26 px)
+                    // Sample circular disk of radius R = 13 px (Diameter 22-34 px)
                     var circleSum = 0.0
                     var darkCount = 0
                     var totalCirclePixels = 0
@@ -477,7 +477,7 @@ class AttendanceProcessor {
                     val circleMean = if (totalCirclePixels > 0) circleSum / totalCirclePixels else bg
                     val circleDarkRatio = if (totalCirclePixels > 0) darkCount.toDouble() / totalCirclePixels else 0.0
 
-                    // Black circle diameter 22-26px, radius 11.5-12.5px rule -> 1 (Green) else 0 (Red)
+                    // Black circle diameter 20-35px, radius 11-15px rule -> 1 (Green) else 0 (Red)
                     val isMarked = circleDarkRatio >= 0.28 || (bg - circleMean) >= 30.0
                     attendance.add(if (isMarked) 1 else 0)
                 }
