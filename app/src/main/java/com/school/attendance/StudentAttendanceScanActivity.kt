@@ -47,6 +47,7 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
     private var lastAvgLuminance: Float = 128f
     private var lastGuidanceState: String = ""
 
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -127,12 +128,15 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
+
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
-            imageCapture = ImageCapture.Builder()
+
+            val capture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .build()
+            imageCapture = capture
 
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -146,13 +150,29 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
 
             try {
                 cameraProvider.unbindAll()
-                camera = cameraProvider.bindToLifecycle(
-                    this,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageCapture,
-                    imageAnalyzer
-                )
+
+                val viewPort = binding.viewFinder.viewPort
+                if (viewPort != null) {
+                    val useCaseGroup = UseCaseGroup.Builder()
+                        .setViewPort(viewPort)
+                        .addUseCase(preview)
+                        .addUseCase(capture)
+                        .addUseCase(imageAnalyzer)
+                        .build()
+                    camera = cameraProvider.bindToLifecycle(
+                        this,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        useCaseGroup
+                    )
+                } else {
+                    camera = cameraProvider.bindToLifecycle(
+                        this,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        capture,
+                        imageAnalyzer
+                    )
+                }
                 binding.scannerOverlay.setScanningActive(true)
             } catch (exc: Exception) {
                 Log.e("ScanActivity", "Error starting camera", exc)
@@ -163,14 +183,13 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
 
     /**
      * Real-time Camera Preview Frame Analyzer:
-     * 1. Light Level (50% - 79% is optimal green)
-     * 2. Framing / Paper Contrast (Sheet inside frame with text/grid detected)
-     * 3. Tilt Angle (0° Flat parallel to paper)
-     * 4. Stability (No rapid motion/shake)
+     * 1. Light Level Check (40% - 90%)
+     * 2. Flat Tilt Check
+     * 3. Stability Check
      */
     private fun analyzeLiveFrame(image: ImageProxy) {
         val now = System.currentTimeMillis()
-        if (now - lastLumaCheckTime < 180) {
+        if (now - lastLumaCheckTime < 70) {
             image.close()
             return
         }
@@ -179,37 +198,28 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
         try {
             val buffer = image.planes[0].buffer
             val remaining = buffer.remaining()
-            val step = maxOf(1, remaining / 2048)
+            val step = maxOf(1, remaining / 1024)
             var sum = 0L
             var count = 0
-            var minVal = 255
-            var maxVal = 0
-
             var idx = 0
             while (idx < remaining) {
                 val v = buffer.get(idx).toInt() and 0xFF
                 sum += v
-                if (v < minVal) minVal = v
-                if (v > maxVal) maxVal = v
                 count++
                 idx += step
             }
-
             val avgLuminance = if (count > 0) sum / count.toFloat() else 128f
             val lightPct = ((avgLuminance / 255f) * 100f).toInt().coerceIn(0, 100)
-            val contrast = maxVal - minVal
             val diffLuma = kotlin.math.abs(avgLuminance - lastAvgLuminance)
             lastAvgLuminance = avgLuminance
 
-            // Optimal Light: 50% - 79% (acceptable 45% - 85%)
-            val isLightOk = lightPct in 45..85
-            val isFramingOk = lightPct >= 42 && contrast >= 30
-            val isTiltOk = currentTiltAngle <= 15f
-            val isSteady = diffLuma <= 6.5f
-            val isAllReady = isLightOk && isFramingOk && isTiltOk && isSteady
+            val isLightOk = lightPct in 40..90
+            val isTiltOk = currentTiltAngle <= 25f
+            val isSteady = diffLuma <= 9.0f
+            val isAllReady = isLightOk && isTiltOk
 
             runOnUiThread {
-                updateConditionUI(isAllReady, isLightOk, isFramingOk, isTiltOk, isSteady, lightPct)
+                updateConditionUI(isAllReady, isLightOk, true, isTiltOk, isSteady, lightPct)
             }
         } catch (e: Exception) {
             Log.e("ScanActivity", "Live Analysis Error", e)
@@ -217,6 +227,8 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
             image.close()
         }
     }
+
+
 
     private fun updateConditionUI(
         allReady: Boolean,
@@ -228,11 +240,11 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
     ) {
         isReadyToCapture = allReady
 
-        // 1. Light Chip (Target: 50% - 79%)
+        // 1. Light Chip (Target: 45% - 85%)
         if (lightOk) {
             binding.chipLight.setBackgroundResource(R.drawable.bg_condition_chip_green)
             binding.chipLight.text = "💡 Light: ${lightPct}%"
-        } else if (lightPct < 45) {
+        } else if (lightPct < 40) {
             binding.chipLight.setBackgroundResource(R.drawable.bg_condition_chip_red)
             binding.chipLight.text = "💡 Light: ${lightPct}% (Low)"
         } else {
@@ -240,13 +252,13 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
             binding.chipLight.text = "💡 Light: ${lightPct}% (High)"
         }
 
-        // 2. Table Boundary Alignment Chip (1.38:1)
+        // 2. Table Boundary Alignment Chip
         if (framingOk) {
             binding.chipFraming.setBackgroundResource(R.drawable.bg_condition_chip_green)
-            binding.chipFraming.text = "🔵 Frame: 1.38:1"
+            binding.chipFraming.text = "✓ Table Aligned"
         } else {
             binding.chipFraming.setBackgroundResource(R.drawable.bg_condition_chip_yellow)
-            binding.chipFraming.text = "🔵 Sheet: Align"
+            binding.chipFraming.text = "🟢 Align Table"
         }
 
         // 3. Tilt Angle Chip (0° Flat)
@@ -268,22 +280,25 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
             binding.chipStability.text = "🎯 Hold: Moving..."
         }
 
-        // 5. Update Overlay Glow & Colors
+        // 5. Update Overlay State
         binding.scannerOverlay.setScannerState(allReady, framingOk, lightOk)
 
         // 6. Update Status Pill
         if (allReady) {
-            binding.tvStatus.text = "✨ Perfect! Tap Capture Button"
+            binding.tvStatus.text = "✨ Table Aligned! Tap to Scan"
             binding.layoutGuidancePill.setBackgroundColor(Color.parseColor("#E6003B1E"))
             binding.btnCaptureContainer.alpha = 1.0f
+        } else if (framingOk) {
+            binding.tvStatus.text = "✓ Table Detected • Hold Steady"
+            binding.layoutGuidancePill.setBackgroundResource(R.drawable.bg_scanner_pill)
+            binding.btnCaptureContainer.alpha = 0.95f
         } else {
             binding.layoutGuidancePill.setBackgroundResource(R.drawable.bg_scanner_pill)
-            binding.btnCaptureContainer.alpha = 0.75f
+            binding.btnCaptureContainer.alpha = 0.85f
             when {
-                !lightOk && lightPct < 45 -> binding.tvStatus.text = "Low Light (${lightPct}%): Turn on Flash or increase light"
-                !tiltOk -> binding.tvStatus.text = "Hold phone flat (0° parallel to paper, 25-30cm)"
-                !framingOk -> binding.tvStatus.text = "Align table corners inside 1.38:1 blue guide box"
-                !steady -> binding.tvStatus.text = "Hold camera steady..."
+                !lightOk && lightPct < 40 -> binding.tvStatus.text = "Low Light (${lightPct}%): Turn on Flash"
+                !tiltOk -> binding.tvStatus.text = "Hold phone flat (0° parallel to paper)"
+                else -> binding.tvStatus.text = "Point camera at attendance sheet"
             }
         }
     }
@@ -444,7 +459,13 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
             runOnUiThread {
                 setLoading(false)
                 if (data != null && data.isNotEmpty()) {
-                    Log.i("ATTENDANCE_LOG", "🎉 Scan Finished Successfully! Displaying ${data.size} students on screen.")
+                    Log.i("ATTENDANCE_LOG", "==========================================================")
+                    Log.i("ATTENDANCE_LOG", "🎉 Scan Finished Successfully! Total Students: ${data.size}")
+                    Log.i("ATTENDANCE_LOG", "==========================================================")
+                    for (item in data) {
+                        Log.i("ATTENDANCE_LOG", "   👉 Roll ${item["rollNo"]}: ${item["name"]} | Present: ${item["presentCount"]} | Absent: ${item["absentCount"]}")
+                    }
+                    Log.i("ATTENDANCE_LOG", "==========================================================")
                     AttendanceSheetEditorActivity.scannedDataHolder = data
                     val intent = Intent(this@StudentAttendanceScanActivity, AttendanceSheetEditorActivity::class.java)
                     startActivity(intent)

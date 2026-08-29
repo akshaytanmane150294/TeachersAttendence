@@ -83,9 +83,10 @@ app.add_middleware(
 
 # Production OCR Processor (Dynamic Row Splitting)
 processor = ProductionAttendanceProcessor()
-OUTPUT_DIR = Path("output")
+# Output directory parallel to app (SchoolAttendance/output)
+OUTPUT_DIR = SERVER_DIR.parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
-TEMPLATES_DIR = Path("templates")
+TEMPLATES_DIR = SERVER_DIR / "templates"
 
 # JWT Bearer security
 security = HTTPBearer()
@@ -469,6 +470,27 @@ def get_student_attendance(class_name: str = "5A", month: str = "", year: int = 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/save_debug_image")
+async def save_debug_image(image: UploadFile = File(...)):
+    """
+    Receives on-device processed debug image from Android phone
+    and saves directly into SchoolAttendance/output/debug_latest.png (parallel to app).
+    """
+    try:
+        contents = await image.read()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        latest_debug = OUTPUT_DIR / "debug_latest.png"
+        time_debug = OUTPUT_DIR / f"debug_latest_{timestamp}.png"
+        with open(latest_debug, "wb") as f:
+            f.write(contents)
+        with open(time_debug, "wb") as f:
+            f.write(contents)
+        logger.info(f"💾 [Android On-Device] Saved debug image to: {time_debug.resolve()}")
+        return {"status": "success", "path": str(time_debug.resolve())}
+    except Exception as e:
+        logger.error(f"Error saving debug image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/process_attendance")
 async def process_attendance(image: UploadFile = File(...)):
     """
@@ -502,14 +524,14 @@ async def process_attendance(image: UploadFile = File(...)):
         result = active_processor.process_image(img)
         records = result.get("data", [])
 
-        # Save annotated debug image (Only debug_latest.png)
+        # Save annotated debug image with timestamp (debug_latest_time.png)
         if "debug_image" in result and result["debug_image"] is not None:
             debug_img = result.pop("debug_image")
-            # debug_path = OUTPUT_DIR / f"debug_attendance_{timestamp}.png"
+            time_debug = OUTPUT_DIR / f"debug_latest_{timestamp}.png"
             latest_debug = OUTPUT_DIR / "debug_latest.png"
-            # cv2.imwrite(str(debug_path), debug_img)
+            cv2.imwrite(str(time_debug), debug_img)
             cv2.imwrite(str(latest_debug), debug_img)
-            logger.info(f"Saved annotated debug image to: {latest_debug.resolve()}")
+            logger.info(f"Saved annotated debug image to: {time_debug.resolve()}")
 
         # [COMMENTED OUT] Coordinate DataFrames to CSV
         y_df = result.pop("horizontal_lines_df", None)

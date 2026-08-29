@@ -207,9 +207,10 @@ class ProductionAttendanceProcessor:
         # Clean Table Bounding Box (Blue Outer Border on exact table black lines)
         table_top_y = raw_y_lines[0] if raw_y_lines else (max(0, student_intervals[0][0] - 52) if student_intervals else 0)
         table_bottom_y = raw_y_lines[-1] if raw_y_lines else (student_intervals[-1][1] if student_intervals else 1380)
-        table_left_x = raw_x_lines[0] if raw_x_lines else 4
-        table_right_x = raw_x_lines[-1] if len(raw_x_lines) > 2 else 1988
-        cv2.rectangle(annotated, (table_left_x, table_top_y), (table_right_x, table_bottom_y), (255, 0, 0), 2)
+        cv2.rectangle(annotated, (table_left_x, table_top_y), (table_right_x, table_bottom_y), (0, 230, 118), 3)
+        for pt in [(table_left_x, table_top_y), (table_right_x, table_top_y), (table_right_x, table_bottom_y), (table_left_x, table_bottom_y)]:
+            cv2.circle(annotated, pt, 8, (0, 230, 118), -1)
+            cv2.circle(annotated, pt, 8, (255, 255, 255), 2)
 
         records = []
 

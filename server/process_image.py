@@ -38,18 +38,18 @@ def run_processing(image_path: str = "sample_attendance.jpg"):
     records = result.get("data", [])
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Output directory
-    output_dir = Path(__file__).parent / "output"
+    # Outer Output directory at workspace root
+    output_dir = Path(__file__).resolve().parent.parent / "output"
     output_dir.mkdir(exist_ok=True)
 
-    # Save annotated debug image (Only debug_latest.png)
+    # Save annotated debug image with timestamp (debug_latest_time.png)
     if "debug_image" in result and result["debug_image"] is not None:
         debug_img = result.pop("debug_image")
-        # debug_path = output_dir / f"debug_attendance_{timestamp}.png"
+        time_debug = output_dir / f"debug_latest_{timestamp}.png"
         latest_debug = output_dir / "debug_latest.png"
-        # cv2.imwrite(str(debug_path), debug_img)
+        cv2.imwrite(str(time_debug), debug_img)
         cv2.imwrite(str(latest_debug), debug_img)
-        print(f"[+] Saved Debug Image: {latest_debug.resolve()}")
+        print(f"[+] Saved Debug Image: {time_debug.resolve()}")
 
     # Build clean Pandas DataFrame
     table_rows = []

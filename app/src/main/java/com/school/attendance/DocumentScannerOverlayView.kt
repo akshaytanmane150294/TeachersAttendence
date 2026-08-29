@@ -35,7 +35,7 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
 
     // Paints
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#99000000") // 60% black scrim
+        color = Color.parseColor("#80000000") // 50% dark scrim
         style = Paint.Style.FILL
     }
 
@@ -44,13 +44,13 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     }
 
     private val frameBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#2979FF") // Electric Blue Table Boundary
+        color = Color.parseColor("#2979FF") // Electric Blue
         style = Paint.Style.STROKE
-        strokeWidth = 2.5f * density
+        strokeWidth = 3f * density
     }
 
     private val cornerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#2979FF") // Blue Corners
+        color = Color.parseColor("#2979FF") // Electric Blue Corners
         style = Paint.Style.STROKE
         strokeWidth = cornerStrokeWidth
         strokeCap = Paint.Cap.ROUND
@@ -58,7 +58,7 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     }
 
     private val badgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#CC1A237E") // Dark Blue Pill
+        color = Color.parseColor("#CC003B1E")
         style = Paint.Style.FILL
     }
 
@@ -70,10 +70,9 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     }
 
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#26FFFFFF") // 15% white dashed grid
+        color = Color.parseColor("#332979FF") // Subtle blue grid lines
         style = Paint.Style.STROKE
-        strokeWidth = 1f * density
-        pathEffect = DashPathEffect(floatArrayOf(6f * density, 6f * density), 0f)
+        strokeWidth = 1.2f * density
     }
 
     private val laserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -99,21 +98,21 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
     // Capture Flash Feedback
     private var isFlashActive = false
     private val flashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#00E676") // Bright success emerald
+        color = Color.parseColor("#FFFFFF") // Bright flash white
         style = Paint.Style.STROKE
-        strokeWidth = cornerStrokeWidth * 1.4f
+        strokeWidth = cornerStrokeWidth * 1.5f
         strokeCap = Paint.Cap.ROUND
     }
 
     init {
         // Hardware acceleration with software layer for PorterDuff.CLEAR compatibility
-        setLayerType(LAYER_TYPE_HARDWARE, null)
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
         initLaserAnimation()
     }
 
     private fun initLaserAnimation() {
         laserAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 2400
+            duration = 2200
             repeatMode = ValueAnimator.REVERSE
             repeatCount = ValueAnimator.INFINITE
             interpolator = AccelerateDecelerateInterpolator()
@@ -147,72 +146,31 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
         frameRect.set(left, top, right, bottom)
     }
 
+
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (frameRect.isEmpty) return
 
-        // 1. Draw outer darkened mask with rounded rect cutout in center
+        // A. Outer darkened mask with transparent cutout
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), maskPaint)
         canvas.drawRoundRect(frameRect, cornerRadius, cornerRadius, clearPaint)
 
-        // 2. Draw Table Guide Boundary (Blue #2979FF when aligning, Emerald Green #00E676 when ready)
-        canvas.drawRoundRect(frameRect, cornerRadius, cornerRadius, frameBorderPaint)
+        // B. Draw green frame boundary
+        val activeBorderPaint = if (isFlashActive) flashPaint else frameBorderPaint
+        canvas.drawRoundRect(frameRect, cornerRadius, cornerRadius, activeBorderPaint)
 
-        // 3. Draw Top Table Guide Badge Tag attached to top-left of the blue box
-        drawTableGuideBadge(canvas)
-
-        // 4. Draw subtle alignment grid lines (attendance table rows & columns hint)
-        drawTableGridGuides(canvas)
-
-        // 5. Draw bold L-shaped corner brackets (CamScanner / Google Drive style)
+        // C. Draw bold L-shaped corner brackets
         val activeCornerPaint = if (isFlashActive) flashPaint else cornerPaint
         drawCornerBrackets(canvas, activeCornerPaint)
 
-        // 6. Draw animated laser scanning beam if scanning is active
+        // D. Draw animated laser scanning beam
         if (isScanning && !isFlashActive) {
             drawLaserBeam(canvas)
         }
     }
 
-    private fun drawTableGuideBadge(canvas: Canvas) {
-        val badgeText = if (isTableReady) "✓ TABLE 100% ALIGNED" else "🔵 ALIGN ATTENDANCE TABLE"
-        val badgeW = badgeTextPaint.measureText(badgeText) + 24f * density
-        val badgeH = 22f * density
-        val badgeL = frameRect.left + 12f * density
-        val badgeT = frameRect.top - badgeH / 2f
-        val badgeR = badgeL + badgeW
-        val badgeB = badgeT + badgeH
-        val badgeRect = RectF(badgeL, badgeT, badgeR, badgeB)
 
-        badgeBgPaint.color = if (isTableReady) Color.parseColor("#E6004D25") else Color.parseColor("#E60D1B4D")
-        canvas.drawRoundRect(badgeRect, 11f * density, 11f * density, badgeBgPaint)
-
-        val textY = badgeT + badgeH / 2f - (badgeTextPaint.descent() + badgeTextPaint.ascent()) / 2f
-        canvas.drawText(badgeText, badgeL + badgeW / 2f, textY, badgeTextPaint)
-    }
-
-    private fun drawTableGridGuides(canvas: Canvas) {
-        val left = frameRect.left
-        val right = frameRect.right
-        val top = frameRect.top
-        val bottom = frameRect.bottom
-        val h = frameRect.height()
-        val w = frameRect.width()
-
-        // 3 horizontal guide lines (header row, middle rows)
-        val row1 = top + h * 0.22f
-        val row2 = top + h * 0.50f
-        val row3 = top + h * 0.78f
-        canvas.drawLine(left + 8f * density, row1, right - 8f * density, row1, gridPaint)
-        canvas.drawLine(left + 8f * density, row2, right - 8f * density, row2, gridPaint)
-        canvas.drawLine(left + 8f * density, row3, right - 8f * density, row3, gridPaint)
-
-        // 2 vertical guide lines (names column, dates/status section)
-        val col1 = left + w * 0.28f
-        val col2 = left + w * 0.75f
-        canvas.drawLine(col1, top + 8f * density, col1, bottom - 8f * density, gridPaint)
-        canvas.drawLine(col2, top + 8f * density, col2, bottom - 8f * density, gridPaint)
-    }
 
     private fun drawCornerBrackets(canvas: Canvas, paint: Paint) {
         val l = frameRect.left
@@ -291,10 +249,9 @@ class DocumentScannerOverlayView @JvmOverloads constructor(
         isLightValid = hasLight
 
         val targetColor = when {
-            isReady -> Color.parseColor("#00E676") // Emerald Green (Ready)
-            !hasFraming -> Color.parseColor("#2979FF") // Electric Blue (Aligning)
-            !hasLight -> Color.parseColor("#FFD600") // Low light yellow
-            else -> Color.parseColor("#2979FF") // Electric Blue Table Guide
+            isReady -> Color.parseColor("#00E676") // Emerald Green (Ready & Aligned)
+            !hasLight -> Color.parseColor("#FFD600") // Low light warning yellow
+            else -> Color.parseColor("#2979FF") // Electric Blue Frame
         }
         val targetFrameColor = if (isReady) Color.parseColor("#E600E676") else Color.parseColor("#CC2979FF")
         

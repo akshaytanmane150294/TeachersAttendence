@@ -1,7 +1,11 @@
 package com.school.attendance
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.os.Environment
 import android.util.Log
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -13,6 +17,9 @@ import org.opencv.android.Utils
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -134,35 +141,9 @@ class AttendanceProcessor {
         Log.i(TAG, "==========================================================")
         Log.i("ATTENDANCE_STEP", "🚀 [STEP 1] Image captured: ${fullBitmap.width}x${fullBitmap.height}")
 
-        // 1. Primary: Try each Python API URL (USB ADB reverse, Wi-Fi LAN IP, Hotspots)
-        for ((idx, url) in SERVER_URLS.withIndex()) {
-            Log.i(TAG, "🌐 [STEP 2.${idx + 1}] Trying Python API endpoint: $url/process_attendance ...")
-            Log.i("ATTENDANCE_STEP", "🌐 Connecting to: $url")
-            val startTime = System.currentTimeMillis()
-            val apiData = callPythonApi(fullBitmap, url)
-            val duration = System.currentTimeMillis() - startTime
-
-            if (apiData != null && apiData.isNotEmpty()) {
-                Log.i(TAG, "✅ [STEP 3] Python API SUCCESS via: $url (Time: ${duration}ms)")
-                Log.i(TAG, "📊 [STEP 4] Extracted Total Students: ${apiData.size}")
-                Log.i("ATTENDANCE_STEP", "✅ Python API SUCCESS! Found ${apiData.size} students.")
-                for (i in 0 until minOf(5, apiData.size)) {
-                    val st = apiData[i]
-                    Log.i(TAG, "   👉 Roll: ${st["rollNo"]} | Name: ${st["name"]} | Present: ${st["presentCount"]} | Absent: ${st["absentCount"]}")
-                }
-                if (apiData.size > 5) {
-                    Log.i(TAG, "   ... and ${apiData.size - 5} more students")
-                }
-                Log.i(TAG, "==========================================================")
-                return apiData
-            } else {
-                Log.w(TAG, "⚠️ Endpoint $url failed (${duration}ms). Trying next...")
-            }
-        }
-
-        // 2. Fallback: On-Device Extraction
-        Log.w(TAG, "⚠️ Python API not reachable on any endpoint. Running On-Device Processor fallback...")
-        Log.w("ATTENDANCE_STEP", "⚠️ Running On-Device Fallback...")
+        // Zero Python API calls - 100% On-Device Computer Vision & ML Kit OCR
+        Log.i(TAG, "📱 Running 100% Offline On-Device Processor (Direct on phone, No Python API)...")
+        Log.i("ATTENDANCE_STEP", "📱 Running 100% On-Device Processor...")
         return processAttendanceOnDevice(fullBitmap)
     }
 
@@ -260,142 +241,255 @@ class AttendanceProcessor {
     }
 
     private fun processAttendanceOnDevice(fullBitmap: Bitmap): List<Map<String, Any>>? {
-        val TAG = "DATA_LOG"
         val oriented = ensureLandscape(fullBitmap)
+        val rectified = rectifyTableGrid(oriented)
 
-        val result1 = extractFromOriented(oriented)
-        val namesCount1 = result1?.count { !it["name"].toString().startsWith("Student ") } ?: 0
-
-        if (result1 != null && namesCount1 >= 5) {
+        val result1 = extractFromOriented(rectified)
+        if (result1 != null && result1.isNotEmpty()) {
             return result1
         }
 
-        val rotated180 = rotateBitmap(oriented, 180f)
+        val rotated180 = rotateBitmap(rectified, 180f)
         val result2 = extractFromOriented(rotated180)
-        val namesCount2 = result2?.count { !it["name"].toString().startsWith("Student ") } ?: 0
+        return result2 ?: result1
+    }
 
-        if (result2 != null && namesCount2 > namesCount1) {
-            return result2
+    /**
+     * Tightly detects the 4 corners of the attendance table grid using OpenCV
+     * and perspective-warps it to standard 2000x1450 resolution (removes all desk/background).
+     */
+    private fun rectifyTableGrid(bitmap: Bitmap): Bitmap {
+        try {
+            val src = Mat()
+            Utils.bitmapToMat(bitmap, src)
+            val gray = Mat()
+            Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY)
+
+            val binImg = Mat()
+            Imgproc.adaptiveThreshold(gray, binImg, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 21, 5.0)
+
+            val w = src.cols()
+            val h = src.rows()
+            val hKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size((w * 0.04).toDouble(), 1.0))
+            val hLines = Mat()
+            Imgproc.morphologyEx(binImg, hLines, Imgproc.MORPH_OPEN, hKernel)
+
+            val vKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(1.0, (h * 0.04).toDouble()))
+            val vLines = Mat()
+            Imgproc.morphologyEx(binImg, vLines, Imgproc.MORPH_OPEN, vKernel)
+
+            val tableGrid = Mat()
+            Core.bitwise_or(hLines, vLines, tableGrid)
+
+            val contours = mutableListOf<MatOfPoint>()
+            Imgproc.findContours(tableGrid, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+            contours.sortByDescending { Imgproc.contourArea(it) }
+
+            if (contours.isNotEmpty() && Imgproc.contourArea(contours[0]) > (w * h * 0.10)) {
+                val mainC = MatOfPoint2f(*contours[0].toArray())
+                val rotRect = Imgproc.minAreaRect(mainC)
+                val pts = Array(4) { Point() }
+                rotRect.points(pts)
+
+                // Order points: Top-Left, Top-Right, Bottom-Right, Bottom-Left
+                val sortedByY = pts.sortedBy { it.y }
+                val topPts = sortedByY.take(2).sortedBy { it.x }
+                val bottomPts = sortedByY.takeLast(2).sortedBy { it.x }
+
+                val tl = topPts[0]
+                val tr = topPts[1]
+                val bl = bottomPts[0]
+                val br = bottomPts[1]
+
+                // Expand corners outward by 0.5% from centroid so outer border lines are never sliced
+                val cx = (tl.x + tr.x + br.x + bl.x) / 4.0
+                val cy = (tl.y + tr.y + br.y + bl.y) / 4.0
+                fun expandPt(p: Point): Point = Point(
+                    (p.x + (p.x - cx) * 0.005).coerceIn(0.0, w - 1.0),
+                    (p.y + (p.y - cy) * 0.005).coerceIn(0.0, h - 1.0)
+                )
+
+                val targetW = 2000.0
+                val targetH = 1450.0
+
+                val srcMat = MatOfPoint2f(expandPt(tl), expandPt(tr), expandPt(br), expandPt(bl))
+                val dstMat = MatOfPoint2f(
+                    Point(0.0, 0.0),
+                    Point(targetW - 1.0, 0.0),
+                    Point(targetW - 1.0, targetH - 1.0),
+                    Point(0.0, targetH - 1.0)
+                )
+
+                val M = Imgproc.getPerspectiveTransform(srcMat, dstMat)
+                val warped = Mat()
+                Imgproc.warpPerspective(src, warped, M, Size(targetW, targetH))
+
+                val resultBmp = Bitmap.createBitmap(targetW.toInt(), targetH.toInt(), Bitmap.Config.ARGB_8888)
+                Utils.matToBitmap(warped, resultBmp)
+                Log.i("DATA_LOG", "✂️ Tightly cropped & perspective warped table to: ${resultBmp.width}x${resultBmp.height}")
+                return resultBmp
+            }
+        } catch (e: Exception) {
+            Log.e("DATA_LOG", "Error in rectifyTableGrid: ${e.message}", e)
         }
-        return result1 ?: result2
+        return bitmap
     }
 
     private fun extractFromOriented(oriented: Bitmap): List<Map<String, Any>>? {
-        val TAG = "DATA_LOG"
         return try {
-            val workBitmap = scaleToWorkingRes(oriented)
+            Log.i("DATA_LOG", "📷 [STEP 1] Starting Circle-Based OMR Analysis on standard ${oriented.width}x${oriented.height} resolution...")
 
             val src = Mat()
-            Utils.bitmapToMat(workBitmap.copy(Bitmap.Config.ARGB_8888, false), src)
+            Utils.bitmapToMat(oriented.copy(Bitmap.Config.ARGB_8888, false), src)
             val gray = Mat()
             Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY)
-            Imgproc.GaussianBlur(gray, gray, Size(3.0, 3.0), 0.0)
 
-            val bw = Mat()
-            Imgproc.adaptiveThreshold(gray, bw, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 21, 7.0)
+            val width = gray.cols()
+            val height = gray.rows()
 
-            val paperRect = findPaperBounds(gray, workBitmap.width, workBitmap.height)
-            val rawHLines = detectHorizontalLines(bw, paperRect)
-            val rawVLines = detectVerticalLines(bw, paperRect)
+            // 1. Detect candidate black circles: Diameter 22-26px, Radius 11.5-12.5px
+            val binInv = Mat()
+            Imgproc.threshold(gray, binInv, 130.0, 255.0, Imgproc.THRESH_BINARY_INV)
+            val contours = mutableListOf<MatOfPoint>()
+            Imgproc.findContours(binInv, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-            val (hLines, vLines, structure) = identifyTableStructure(rawHLines, rawVLines, paperRect)
-            if (hLines.size < 3 || vLines.size < 5) return null
+            val candidateCenters = mutableListOf<Pair<Double, Double>>()
+            for (c in contours) {
+                val rect = Imgproc.boundingRect(c)
+                val bw = rect.width
+                val bh = rect.height
+                val area = Imgproc.contourArea(c)
+                val aspect = if (bh > 0) bw.toDouble() / bh else 0.0
+                // User rule: Diameter 22-26px, Radius 11.5-12.5px
+                if (bw in 18..30 && bh in 18..30 && aspect in 0.70..1.35 && area in 220.0..700.0) {
+                    val cx = rect.x + bw / 2.0
+                    val cy = rect.y + bh / 2.0
+                    if (cx in 330.0..1880.0 && cy in 80.0..1440.0) {
+                        candidateCenters.add(Pair(cx, cy))
+                    }
+                }
+            }
 
-            val numStudentRows = hLines.size - 1
-            val numDays = structure.dayColEdges.size - 1
+            if (candidateCenters.isEmpty()) {
+                Log.w("DATA_LOG", "⚠️ No black circles detected.")
+                return null
+            }
 
-            val scaleX = oriented.width.toDouble() / workBitmap.width
-            val scaleY = oriented.height.toDouble() / workBitmap.height
+            // 2. Derive Dynamic Student Rows along Y
+            val sortedYs = candidateCenters.map { it.second }.sorted()
+            val rowCenters = mutableListOf<Double>()
+            var currYCluster = mutableListOf(sortedYs[0])
+            for (i in 1 until sortedYs.size) {
+                val y = sortedYs[i]
+                if (y - currYCluster.last() < 20.0) {
+                    currYCluster.add(y)
+                } else {
+                    rowCenters.add(currYCluster.average())
+                    currYCluster = mutableListOf(y)
+                }
+            }
+            if (currYCluster.isNotEmpty()) {
+                rowCenters.add(currYCluster.average())
+            }
 
-            val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
-                com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
+            // 3. Derive Dynamic Day Columns along X
+            val sortedXs = candidateCenters.map { it.first }.sorted()
+            val colCenters = mutableListOf<Double>()
+            var currXCluster = mutableListOf(sortedXs[0])
+            for (i in 1 until sortedXs.size) {
+                val x = sortedXs[i]
+                if (x - currXCluster.last() < 20.0) {
+                    currXCluster.add(x)
+                } else {
+                    colCenters.add(currXCluster.average())
+                    currXCluster = mutableListOf(x)
+                }
+            }
+            if (currXCluster.isNotEmpty()) {
+                colCenters.add(currXCluster.average())
+            }
 
-            val rawRecords = mutableListOf<MutableMap<String, Any>>()
-            val rawRollNumbers = mutableListOf<String>()
+            Log.i("DATA_LOG", "📊 Detected ${rowCenters.size} dynamic student rows and ${colCenters.size} day columns from black circles")
 
-            for (r in 0 until numStudentRows) {
-                val y1 = hLines[r]
-                val y2 = hLines[r + 1]
-                val rowHeight = y2 - y1
-                if (rowHeight < 6) continue
+            // Read raw gray bytes once for instant sampling
+            val grayBytes = ByteArray(width * height)
+            gray.get(0, 0, grayBytes)
 
-                val fullY1 = (y1 * scaleY).toInt()
-                val fullY2 = (y2 * scaleY).toInt()
-                val fullRowH = Math.max(1, fullY2 - fullY1)
+            val R = 12 // User rule: Radius 11.5 - 12.5px (Diameter 22 - 26px)
+            val totalStudents = rowCenters.size
+            val numDays = minOf(31, colCenters.size)
+            val finalResults = mutableListOf<Map<String, Any>>()
 
-                val padY = Math.max(3, (fullRowH * 0.20).toInt())
-                val cropY = Math.max(0, fullY1 - padY)
-                val cropH = Math.min(oriented.height - cropY, fullRowH + 2 * padY)
-
-                val infoX1 = Math.max(0, (structure.rollLeft * scaleX).toInt() - 4)
-                val infoX2 = Math.min(oriented.width, (structure.nameRight * scaleX).toInt() + 4)
-                val infoW = Math.max(1, infoX2 - infoX1)
-                val infoBmp = safeCrop(oriented, Rect(infoX1, cropY, infoW, cropH))
-                val rawInfoText = if (infoBmp != null) ocrText(recognizer, infoBmp) else ""
-
-                val lower = rawInfoText.lowercase()
-                val isHeader = (lower.contains("roll") || lower.contains("rol") || lower.contains("no.")) &&
-                               (lower.contains("name") || lower.contains("student") || lower.contains("shudent") || lower.contains("nama")) ||
-                               (r <= 2 && (lower.contains("roll") || lower.contains("name") || lower.contains("student") || lower.contains("month")))
-
-                if (isHeader) continue
-                if (r <= 2 && rawInfoText.isBlank()) continue
+            for (sIdx in 0 until totalStudents) {
+                val rollNo = (101 + sIdx).toString()
+                val studentName = "Student $rollNo"
+                val ry = rowCenters[sIdx]
+                val ryInt = Math.round(ry).toInt()
 
                 val attendance = mutableListOf<Int>()
                 for (d in 0 until numDays) {
-                    val x1 = structure.dayColEdges[d]
-                    val x2 = structure.dayColEdges[d + 1]
-                    val cw = x2 - x1
-                    val ch = rowHeight
+                    val cx = colCenters[d]
+                    val cxInt = Math.round(cx).toInt()
 
-                    val marginX = Math.max(2, (cw * 0.18).toInt())
-                    val marginY = Math.max(2, (ch * 0.18).toInt())
-                    val rx = x1 + marginX
-                    val ry = y1 + marginY
-                    val rw = Math.max(1, cw - 2 * marginX)
-                    val rh = Math.max(1, ch - 2 * marginY)
-
-                    val rect = Rect(rx, ry, rw, rh)
-                    if (rect.x >= 0 && rect.y >= 0 &&
-                        rect.x + rect.width <= bw.cols() &&
-                        rect.y + rect.height <= bw.rows()) {
-                        val cell = Mat(bw, rect)
-                        attendance.add(if (detectInk(cell)) 1 else 0)
-                    } else {
-                        attendance.add(0)
+                    // Sample local paper background in cell margin outside R (distance 15 to 21 px)
+                    val bgSamples = ArrayList<Int>(32)
+                    for (dy in -20..20 step 4) {
+                        val py = ryInt + dy
+                        if (py < 0 || py >= height) continue
+                        for (dx in -20..20 step 4) {
+                            val px = cxInt + dx
+                            if (px < 0 || px >= width) continue
+                            val dSq = dx * dx + dy * dy
+                            if (dSq in (15 * 15)..(21 * 21)) {
+                                bgSamples.add(grayBytes[py * width + px].toInt() and 0xFF)
+                            }
+                        }
                     }
+                    val bg = if (bgSamples.isNotEmpty()) {
+                        bgSamples.sort()
+                        bgSamples[bgSamples.size / 2].toDouble()
+                    } else {
+                        220.0
+                    }
+
+                    // Sample circular disk of radius R = 12 px (Diameter 22-26 px)
+                    var circleSum = 0.0
+                    var darkCount = 0
+                    var totalCirclePixels = 0
+
+                    for (dy in -R..R) {
+                        val py = ryInt + dy
+                        if (py < 0 || py >= height) continue
+                        for (dx in -R..R) {
+                            val px = cxInt + dx
+                            if (px < 0 || px >= width) continue
+                            if (dx * dx + dy * dy <= R * R) {
+                                val v = grayBytes[py * width + px].toInt() and 0xFF
+                                circleSum += v
+                                totalCirclePixels++
+                                if (v < bg - 25.0) {
+                                    darkCount++
+                                }
+                            }
+                        }
+                    }
+
+                    val circleMean = if (totalCirclePixels > 0) circleSum / totalCirclePixels else bg
+                    val circleDarkRatio = if (totalCirclePixels > 0) darkCount.toDouble() / totalCirclePixels else 0.0
+
+                    // Black circle diameter 22-26px, radius 11.5-12.5px rule -> 1 (Green) else 0 (Red)
+                    val isMarked = circleDarkRatio >= 0.28 || (bg - circleMean) >= 30.0
+                    attendance.add(if (isMarked) 1 else 0)
                 }
 
                 val presentCount = attendance.count { it == 1 }
                 val absentCount = attendance.count { it == 0 }
 
-                if (rawInfoText.isBlank() && presentCount == 0 && r >= numStudentRows - 2) continue
-
-                val tokens = rawInfoText.split(Regex("\\s+")).filter { it.isNotBlank() }
-                val digitsFound = mutableListOf<String>()
-                val nameWords = mutableListOf<String>()
-
-                for (token in tokens) {
-                    val digits = token.filter { it.isDigit() }
-                    val letters = token.filter { it.isLetter() }
-                    if (digits.isNotEmpty() && letters.isEmpty()) {
-                        digitsFound.add(digits)
-                    } else if (letters.isNotEmpty()) {
-                        val isGarbage = letters.length > 3 && letters.toSet().size <= 2
-                        if (!isGarbage) {
-                            nameWords.add(letters.lowercase().replaceFirstChar { it.uppercase() })
-                        }
-                    }
-                }
-
-                val detectedRoll = digitsFound.firstOrNull() ?: ""
-                val cleanName = nameWords.distinct().joinToString(" ").trim()
-                rawRollNumbers.add(detectedRoll)
-
-                rawRecords.add(
-                    mutableMapOf(
-                        "rollNo" to detectedRoll,
-                        "name" to cleanName,
+                finalResults.add(
+                    mapOf(
+                        "rowIndex" to sIdx + 1,
+                        "rollNo" to rollNo,
+                        "name" to studentName,
                         "attendance" to attendance,
                         "presentCount" to presentCount,
                         "absentCount" to absentCount
@@ -403,22 +497,132 @@ class AttendanceProcessor {
                 )
             }
 
-            val correctedRolls = correctRollNumberSequence(rawRollNumbers)
-            val finalResults = mutableListOf<Map<String, Any>>()
-
-            for (i in 0 until rawRecords.size) {
-                val rec = rawRecords[i]
-                val corrRoll = correctedRolls[i]
-                val currentName = rec["name"].toString()
-                val effectiveName = if (currentName.length >= 2 && !currentName.startsWith("Student ")) currentName else "Student $corrRoll"
-
-                rec["rollNo"] = corrRoll
-                rec["name"] = effectiveName
-                finalResults.add(rec)
+            Log.i("DATA_LOG", "\n==========================================================================================")
+            Log.i("DATA_LOG", "📋 [STEP 5] ATTENDANCE EXTRACTION COMPLETE - TOTAL STUDENTS: ${finalResults.size}")
+            Log.i("DATA_LOG", "==========================================================================================")
+            Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Day Marks (D1..D31)"))
+            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+            for (res in finalResults) {
+                val roll = res["rollNo"] ?: ""
+                val name = res["name"] ?: ""
+                val pCount = res["presentCount"] ?: 0
+                val aCount = res["absentCount"] ?: 0
+                val attList = (res["attendance"] as? List<*>)?.map { if (it == 1) "P" else "A" }?.joinToString(" ") ?: ""
+                Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", roll, name, pCount, aCount, attList))
             }
-            if (finalResults.isEmpty()) null else finalResults
+            Log.i("DATA_LOG", "==========================================================================================\n")
+            Log.i("ATTENDANCE_STEP", "🎉 Extraction Complete! Found ${finalResults.size} students with full marks.")
+
+            saveAnnotatedDebugCircles(oriented, rowCenters, colCenters, finalResults)
+            finalResults
         } catch (e: Exception) {
+            Log.e("DATA_LOG", "Error in extractFromOriented: ${e.message}", e)
             null
+        }
+    }
+
+    /**
+     * Annotates the attendance sheet: Green dot for black circles (diameter 22-26px), Red dot for empty cells
+     */
+    private fun saveAnnotatedDebugCircles(
+        original: Bitmap,
+        rowCenters: List<Double>,
+        colCenters: List<Double>,
+        results: List<Map<String, Any>>
+    ) {
+        try {
+            val annotBitmap = original.copy(Bitmap.Config.ARGB_8888, true)
+            val canvas = Canvas(annotBitmap)
+
+            val paintGreen = Paint().apply {
+                color = Color.parseColor("#00E676") // Bright Green dot for black circle (Present)
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
+            val paintRed = Paint().apply {
+                color = Color.parseColor("#FF1744") // Bright Red dot for empty cell (Absent)
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
+            val paintGreenBox = Paint().apply {
+                color = Color.parseColor("#00E676")
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+                isAntiAlias = true
+            }
+            val paintCornerDot = Paint().apply {
+                color = Color.parseColor("#00E676")
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
+            val paintCornerRing = Paint().apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 2.5f
+                isAntiAlias = true
+            }
+
+            // Draw outer green boundary box and corner circles
+            val bw = annotBitmap.width.toFloat()
+            val bh = annotBitmap.height.toFloat()
+            canvas.drawRect(0f, 0f, bw, bh, paintGreenBox)
+
+            val corners = listOf(
+                Pair(0f, 0f),
+                Pair(bw, 0f),
+                Pair(bw, bh),
+                Pair(0f, bh)
+            )
+            for ((cx, cy) in corners) {
+                canvas.drawCircle(cx, cy, 14f, paintCornerDot)
+                canvas.drawCircle(cx, cy, 14f, paintCornerRing)
+            }
+
+            // Draw Green dots for Present (R=12 circle detected), Red dots for Empty
+            for (r in 0 until minOf(rowCenters.size, results.size)) {
+                val cy = rowCenters[r].toFloat()
+                val attList = results[r]["attendance"] as? List<*> ?: emptyList<Any>()
+                for (c in 0 until minOf(colCenters.size, attList.size)) {
+                    val cx = colCenters[c].toFloat()
+                    val isPresent = attList[c] == 1
+                    if (isPresent) {
+                        canvas.drawCircle(cx, cy, 7f, paintGreen)
+                    } else {
+                        canvas.drawCircle(cx, cy, 3f, paintRed)
+                    }
+                }
+            }
+
+            // 1. Save to outer output folder directly on device storage with timestamp
+            val timeStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val timeFilename = "debug_latest_$timeStr.png"
+
+            val outputDirs = listOf(
+                File("/sdcard/output"),
+                File(Environment.getExternalStorageDirectory(), "output"),
+                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "output"),
+                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "output"),
+                File("/sdcard/Download/SchoolAttendance/output")
+            )
+
+            for (dir in outputDirs) {
+                try {
+                    if (!dir.exists()) dir.mkdirs()
+                    // Save timestamped file
+                    val timeFile = File(dir, timeFilename)
+                    FileOutputStream(timeFile).use { out ->
+                        annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    // Also update latest pointer
+                    val debugFile = File(dir, "debug_latest.png")
+                    FileOutputStream(debugFile).use { out ->
+                        annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    Log.i("DATA_LOG", "💾 Saved timestamped debug image to: ${timeFile.absolutePath}")
+                } catch (ignored: Exception) { }
+            }
+        } catch (e: Exception) {
+            Log.e("DATA_LOG", "Error saving debug image: ${e.message}", e)
         }
     }
 
@@ -432,55 +636,138 @@ class AttendanceProcessor {
         } catch (e: Exception) { null }
     }
 
-    private fun detectInk(cell: Mat): Boolean {
-        if (cell.empty()) return false
-        val b = Math.max(1, (Math.min(cell.rows(), cell.cols()) * 0.05).toInt())
-        val innerCell = if (cell.rows() > 2 * b && cell.cols() > 2 * b) {
-            Mat(cell, Rect(b, b, cell.cols() - 2 * b, cell.rows() - 2 * b))
+    /**
+     * High-Accuracy OMR Bubble Detector inspired by OpenScanVision:
+     * 1. Local Background Sampling (from margins/ring around bubble, completely immune to shadows)
+     * 2. Centroid Micro-Search (snaps to black circle center in case of minor cell shift)
+     * 3. Weighted Circular Disk Kernel (maximum weight at center, zero at edge - eliminates grid border line interference)
+     * 4. Inner Core Fill Ratio (verifies solid ink coverage inside 6-8px center)
+     * 5. Dual-Metric Decision Score
+     */
+    private fun detectCellMark(
+        grayBytes: ByteArray,
+        width: Int,
+        height: Int,
+        x1: Int,
+        y1: Int,
+        x2: Int,
+        y2: Int
+    ): Boolean {
+        val cw = x2 - x1
+        val ch = y2 - y1
+        if (cw < 6 || ch < 6) return false
+
+        val cx = (x1 + x2) / 2
+        val cy = (y1 + y2) / 2
+
+        // Bubble geometry based on cell size
+        val minDim = minOf(cw, ch)
+        val bubbleR = (minDim * 0.32).toInt().coerceIn(6, 14)
+        val innerR = (bubbleR * 0.55).toInt().coerceIn(3, 7)
+        val ringInner = bubbleR + 2
+        val ringOuter = (minDim * 0.48).toInt().coerceAtLeast(ringInner + 1)
+
+        // 1. Sample Local Paper Background from outer ring / margins (staying inside cell borders)
+        val bgSamples = ArrayList<Int>(48)
+        for (dy in -ringOuter..ringOuter) {
+            val py = cy + dy
+            if (py <= y1 + 1 || py >= y2 - 1 || py < 0 || py >= height) continue
+            for (dx in -ringOuter..ringOuter) {
+                val px = cx + dx
+                if (px <= x1 + 1 || px >= x2 - 1 || px < 0 || px >= width) continue
+                val distSq = dx * dx + dy * dy
+                if (distSq >= ringInner * ringInner && distSq <= ringOuter * ringOuter) {
+                    val v = grayBytes[py * width + px].toInt() and 0xFF
+                    bgSamples.add(v)
+                }
+            }
+        }
+        val localBg = if (bgSamples.isNotEmpty()) {
+            bgSamples.sort()
+            // 75th percentile of background samples represents clean unshaded paper
+            bgSamples[(bgSamples.size * 3) / 4].toFloat()
         } else {
-            cell
+            220f
         }
 
-        val totalPixels = innerCell.rows() * innerCell.cols()
-        val darkPixels = Core.countNonZero(innerCell)
-        val inkRatio = darkPixels.toDouble() / Math.max(1, totalPixels)
-        return inkRatio >= 0.04
-    }
+        // 2. Centroid Micro-Search: snap to darkest center in ±3px window
+        var bestCx = cx
+        var bestCy = cy
+        var minIntensity = 255
+        val searchR = (bubbleR * 0.35).toInt().coerceIn(2, 4)
 
-    private fun correctRollNumberSequence(ocrRolls: List<String>): List<String> {
-        val parsed = ocrRolls.map { text ->
-            val digits = text.filter { it.isDigit() }
-            if (digits.isNotEmpty()) digits.toIntOrNull() else null
-        }
-
-        val diffs = mutableListOf<Int>()
-        for (i in 1 until parsed.size) {
-            val prev = parsed[i - 1]
-            val curr = parsed[i]
-            if (prev != null && curr != null) {
-                val d = curr - prev
-                if (d in 1..3) diffs.add(d)
+        for (sdy in -searchR..searchR) {
+            val sy = cy + sdy
+            if (sy <= y1 + 1 || sy >= y2 - 1 || sy < 0 || sy >= height) continue
+            for (sdx in -searchR..searchR) {
+                val sx = cx + sdx
+                if (sx <= x1 + 1 || sx >= x2 - 1 || sx < 0 || sx >= width) continue
+                val v = grayBytes[sy * width + sx].toInt() and 0xFF
+                if (v < minIntensity) {
+                    minIntensity = v
+                    bestCx = sx
+                    bestCy = sy
+                }
             }
         }
 
-        val step = if (diffs.isNotEmpty()) {
-            diffs.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: 1
-        } else {
-            1
+        // Only shift center if there is noticeable ink signal
+        if (localBg - minIntensity < 18f) {
+            bestCx = cx
+            bestCy = cy
         }
 
-        var anchorIdx = parsed.indexOfFirst { it != null && it >= 100 }
-        if (anchorIdx == -1) anchorIdx = parsed.indexOfFirst { it != null }
+        // 3. Weighted Circular Disk Kernel: center weight = 1.0, edge weight = 0.0
+        var weightedSum = 0.0
+        var totalWeight = 0.0
 
-        val anchorVal = if (anchorIdx != -1 && parsed[anchorIdx] != null) parsed[anchorIdx]!! else 101
-        val actualAnchorIdx = if (anchorIdx != -1) anchorIdx else 0
-
-        val corrected = mutableListOf<String>()
-        for (i in parsed.indices) {
-            val expected = anchorVal + (i - actualAnchorIdx) * step
-            corrected.add(expected.toString())
+        for (dy in -bubbleR..bubbleR) {
+            val py = bestCy + dy
+            if (py <= y1 || py >= y2 || py < 0 || py >= height) continue
+            for (dx in -bubbleR..bubbleR) {
+                val px = bestCx + dx
+                if (px <= x1 || px >= x2 || px < 0 || px >= width) continue
+                val distSq = dx * dx + dy * dy
+                if (distSq <= bubbleR * bubbleR) {
+                    val dist = Math.sqrt(distSq.toDouble())
+                    val weight = 1.0 - (dist / bubbleR)
+                    val grayVal = grayBytes[py * width + px].toInt() and 0xFF
+                    weightedSum += grayVal * weight
+                    totalWeight += weight
+                }
+            }
         }
-        return corrected
+
+        val weightedIntensity = if (totalWeight > 0) (weightedSum / totalWeight).toFloat() else localBg
+        val normalizedDarkness = ((localBg - weightedIntensity) / maxOf(1f, localBg)).coerceIn(0f, 1f)
+
+        // 4. Inner Core Fill Ratio (Center 6-8px)
+        val inkThresh = localBg - maxOf(28f, localBg * 0.25f)
+        var darkCount = 0
+        var totalCore = 0
+
+        for (dy in -innerR..innerR) {
+            val py = bestCy + dy
+            if (py <= y1 || py >= y2 || py < 0 || py >= height) continue
+            for (dx in -innerR..innerR) {
+                val px = bestCx + dx
+                if (px <= x1 || px >= x2 || px < 0 || px >= width) continue
+                val distSq = dx * dx + dy * dy
+                if (distSq <= innerR * innerR) {
+                    val grayVal = grayBytes[py * width + px].toInt() and 0xFF
+                    totalCore++
+                    if (grayVal <= inkThresh) {
+                        darkCount++
+                    }
+                }
+            }
+        }
+
+        val fillRatio = if (totalCore > 0) (darkCount.toFloat() / totalCore) else 0f
+
+        // 5. Dual-Metric Combined Decision Score
+        val combinedScore = 0.60f * normalizedDarkness + 0.40f * fillRatio
+        return combinedScore >= 0.28f || (normalizedDarkness >= 0.24f && fillRatio >= 0.18f) || fillRatio >= 0.40f
     }
 
     private fun identifyTableStructure(
@@ -489,15 +776,14 @@ class AttendanceProcessor {
         bounds: Rect
     ): Triple<List<Int>, List<Int>, TableStructure> {
         val validH = rawHLines.filter { it in (bounds.y + 5)..(bounds.y + bounds.height - 5) }
-        val hGaps = (0 until validH.size - 1).map { validH[it + 1] - validH[it] }.filter { it in 10..35 }
-        val medianH = if (hGaps.isNotEmpty()) hGaps.sorted()[hGaps.size / 2].toDouble() else 16.0
-
         val tableTop = if (validH.isNotEmpty()) validH.first() else bounds.y + 20
         val tableBottom = if (validH.isNotEmpty()) validH.last() else bounds.y + bounds.height - 20
         val totalH = tableBottom - tableTop
-        val numRows = Math.max(5, Math.round(totalH / medianH).toInt())
-        val exactRowH = totalH.toDouble() / numRows
-        val hLines = (0..numRows).map { (tableTop + it * exactRowH).toInt() }
+
+        // Attendance sheet: 1 Header Row + 25 Student Rows = exactly 26 rows
+        val targetRows = 26
+        val exactRowH = totalH.toDouble() / targetRows
+        val hLines = (0..targetRows).map { (tableTop + it * exactRowH).toInt() }
 
         val validV = rawVLines.filter { it in (bounds.x + 5)..(bounds.x + bounds.width - 5) }
         val vGaps = (0 until validV.size - 1).map { validV[it + 1] - validV[it] }
@@ -519,14 +805,12 @@ class AttendanceProcessor {
         val dayStart = nameRight
         val tableRight = if (validV.isNotEmpty()) validV.last() else bounds.x + bounds.width - 20
 
-        val rightVGaps = (nameColIndex + 1 until validV.size - 1).map { validV[it + 1] - validV[it] }.filter { it in 10..35 }
-        val medianDayW = if (rightVGaps.isNotEmpty()) rightVGaps.sorted()[rightVGaps.size / 2].toDouble() else 16.5
-
         val totalDaysWidth = tableRight - dayStart
-        val numDays = Math.max(10, Math.round(totalDaysWidth / medianDayW).toInt())
-        val exactDayW = totalDaysWidth.toDouble() / numDays
+        // Exactly 31 Day Columns (1..31) + Column P + Column A = 33 columns
+        val targetCols = 33
+        val exactDayW = totalDaysWidth.toDouble() / targetCols
 
-        val dayColEdges = (0..numDays).map { (dayStart + it * exactDayW).toInt() }
+        val dayColEdges = (0..targetCols).map { (dayStart + it * exactDayW).toInt() }
         val vLines = mutableListOf<Int>()
         vLines.add(rollLeft)
         if (rollRight != rollLeft && rollRight != nameRight) vLines.add(rollRight)
