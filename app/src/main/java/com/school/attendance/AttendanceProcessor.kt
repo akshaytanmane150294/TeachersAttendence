@@ -347,9 +347,9 @@ class AttendanceProcessor {
             val width = gray.cols()
             val height = gray.rows()
 
-            // 1. Detect candidate black circles: Diameter 22-26px, Radius 11.5-12.5px
+            // 1. Detect candidate black circles: Threshold 148.0 (captures ink in all lighting conditions)
             val binInv = Mat()
-            Imgproc.threshold(gray, binInv, 130.0, 255.0, Imgproc.THRESH_BINARY_INV)
+            Imgproc.threshold(gray, binInv, 148.0, 255.0, Imgproc.THRESH_BINARY_INV)
             val contours = mutableListOf<MatOfPoint>()
             Imgproc.findContours(binInv, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
@@ -361,7 +361,7 @@ class AttendanceProcessor {
                 val area = Imgproc.contourArea(c)
                 val aspect = if (bh > 0) bw.toDouble() / bh else 0.0
                 // User rule: Diameter 20-35px, Radius 10-17.5px (R in 11..15px)
-                if (bw in 18..35 && bh in 18..35 && aspect in 0.65..1.40 && area in 200.0..950.0) {
+                if (bw in 16..36 && bh in 16..36 && aspect in 0.65..1.45 && area in 180.0..1000.0) {
                     val cx = rect.x + bw / 2.0
                     val cy = rect.y + bh / 2.0
                     if (cx in 330.0..1880.0 && cy in 80.0..1440.0) {
