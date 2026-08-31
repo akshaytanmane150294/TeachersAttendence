@@ -485,44 +485,130 @@ class AttendanceProcessor {
                 val presentCount = attendance.count { it == 1 }
                 val absentCount = attendance.count { it == 0 }
 
-                finalResults.add(
-                    mapOf(
-                        "rowIndex" to sIdx + 1,
-                        "rollNo" to rollNo,
-                        "name" to studentName,
-                        "attendance" to attendance,
-                        "presentCount" to presentCount,
-                        "absentCount" to absentCount
+                    finalResults.add(
+                        mapOf(
+                            "rowIndex" to sIdx + 1,
+                            "rollNo" to rollNo,
+                            "name" to studentName,
+                            "attendance" to attendance,
+                            "presentCount" to presentCount,
+                            "absentCount" to absentCount
+                        )
                     )
-                )
-            }
+                }
 
-            Log.i("DATA_LOG", "\n==========================================================================================")
-            Log.i("DATA_LOG", "📋 [STEP 5] ATTENDANCE EXTRACTION COMPLETE - TOTAL STUDENTS: ${finalResults.size}")
-            Log.i("DATA_LOG", "==========================================================================================")
-            Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Day Marks (D1..D31)"))
-            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
-            for (res in finalResults) {
-                val roll = res["rollNo"] ?: ""
-                val name = res["name"] ?: ""
-                val pCount = res["presentCount"] ?: 0
-                val aCount = res["absentCount"] ?: 0
-                val attList = (res["attendance"] as? List<*>)?.map { if (it == 1) "P" else "A" }?.joinToString(" ") ?: ""
-                Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", roll, name, pCount, aCount, attList))
-            }
-            Log.i("DATA_LOG", "==========================================================================================\n")
-            Log.i("ATTENDANCE_STEP", "🎉 Extraction Complete! Found ${finalResults.size} students with full marks.")
+                // 4. Fill remaining leftover cells (width 48-51px, height 52-55px) with Red Dots (Absent)
+                val bwLines = Mat()
+                Imgproc.adaptiveThreshold(gray, bwLines, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 21, 5.0)
 
-            saveAnnotatedDebugCircles(oriented, rowCenters, colCenters, finalResults)
-            finalResults
-        } catch (e: Exception) {
-            Log.e("DATA_LOG", "Error in extractFromOriented: ${e.message}", e)
-            null
+                // Detect Horizontal grid lines (rows)
+                val hKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(250.0, 1.0))
+                val hMorph = Mat()
+                Imgproc.morphologyEx(bwLines, hMorph, Imgproc.MORPH_OPEN, hKernel)
+                val hProj = Mat()
+                Core.reduce(hMorph, hProj, 1, Core.REDUCE_SUM, CvType.CV_32F)
+                val hVals = FloatArray(height)
+                hProj.get(0, 0, hVals)
+                val hMax = hVals.maxOrNull() ?: 1f
+                val hPeaks = mutableListOf<Int>()
+                for (y in 1 until height - 1) {
+                    if (hVals[y] > hMax * 0.10f && hVals[y] >= hVals[y - 1] && hVals[y] >= hVals[y + 1]) {
+                        if (hPeaks.isEmpty() || (y - hPeaks.last()) >= 35) {
+                            hPeaks.add(y)
+                        }
+                    }
+                }
+
+                // Detect Vertical grid lines (columns)
+                val vKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(1.0, 150.0))
+                val vMorph = Mat()
+                Imgproc.morphologyEx(bwLines, vMorph, Imgproc.MORPH_OPEN, vKernel)
+                val vProj = Mat()
+                Core.reduce(vMorph, vProj, 0, Core.REDUCE_SUM, CvType.CV_32F)
+                val vVals = FloatArray(width)
+                vProj.get(0, 0, vVals)
+                val vMax = vVals.maxOrNull() ?: 1f
+                val vPeaks = mutableListOf<Int>()
+                for (x in 1 until width - 1) {
+                    if (vVals[x] > vMax * 0.08f && vVals[x] >= vVals[x - 1] && vVals[x] >= vVals[x + 1]) {
+                        if (vPeaks.isEmpty() || (x - vPeaks.last()) >= 30) {
+                            vPeaks.add(x)
+                        }
+                    }
+                }
+
+                // Small cell row bounds: Height 50-56 px
+                val gridRowBounds = mutableListOf<Pair<Int, Int>>()
+                for (i in 0 until hPeaks.size - 1) {
+                    val gap = hPeaks[i + 1] - hPeaks[i]
+                    if (gap in 46..62) {
+                        gridRowBounds.add(Pair(hPeaks[i], hPeaks[i + 1]))
+                    }
+                }
+
+                // Small cell column bounds: Width 48-52 px (starts after Name column >150px)
+                var dayStartIdx = 0
+                for (i in 0 until vPeaks.size - 1) {
+                    if (vPeaks[i + 1] - vPeaks[i] > 150) {
+                        dayStartIdx = i + 1
+                        break
+                    }
+                }
+                val gridColBounds = mutableListOf<Pair<Int, Int>>()
+                val maxCol = minOf(dayStartIdx + 31, vPeaks.size - 1)
+                for (i in dayStartIdx until maxCol) {
+                    gridColBounds.add(Pair(vPeaks[i], vPeaks[i + 1]))
+                }
+
+                // Add student records for any leftover empty rows (e.g. Roll 114 to 125)
+                val allRowCenters = rowCenters.toMutableList()
+                for (rBound in gridRowBounds) {
+                    val ry = (rBound.first + rBound.second) / 2.0
+                    val alreadyProcessed = rowCenters.any { Math.abs(it - ry) < 26.0 }
+                    if (!alreadyProcessed) {
+                        allRowCenters.add(ry)
+                        val rollNo = (101 + finalResults.size).toString()
+                        val studentName = "Student $rollNo"
+                        val emptyAttendance = List(numDays) { 0 }
+                        finalResults.add(
+                            mapOf(
+                                "rowIndex" to finalResults.size + 1,
+                                "rollNo" to rollNo,
+                                "name" to studentName,
+                                "attendance" to emptyAttendance,
+                                "presentCount" to 0,
+                                "absentCount" to numDays
+                            )
+                        )
+                    }
+                }
+
+                Log.i("DATA_LOG", "\n==========================================================================================")
+                Log.i("DATA_LOG", "📋 [STEP 5] ATTENDANCE EXTRACTION COMPLETE - TOTAL STUDENTS: ${finalResults.size}")
+                Log.i("DATA_LOG", "==========================================================================================")
+                Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Day Marks (D1..D31)"))
+                Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+                for (res in finalResults) {
+                    val roll = res["rollNo"] ?: ""
+                    val name = res["name"] ?: ""
+                    val pCount = res["presentCount"] ?: 0
+                    val aCount = res["absentCount"] ?: 0
+                    val attList = (res["attendance"] as? List<*>)?.map { if (it == 1) "P" else "A" }?.joinToString(" ") ?: ""
+                    Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", roll, name, pCount, aCount, attList))
+                }
+                Log.i("DATA_LOG", "==========================================================================================\n")
+                Log.i("ATTENDANCE_STEP", "🎉 Extraction Complete! Found ${finalResults.size} students with full marks.")
+
+                saveAnnotatedDebugCircles(oriented, allRowCenters, colCenters, finalResults)
+                finalResults
+            } catch (e: Exception) {
+                Log.e("DATA_LOG", "Error in extractFromOriented: ${e.message}", e)
+                null
+            }
         }
-    }
 
     /**
-     * Annotates the attendance sheet: Green dot for black circles (diameter 22-26px), Red dot for empty cells
+     * Annotates the attendance sheet: Green dot for black circles, Red dot for empty & leftover cells
      */
     private fun saveAnnotatedDebugCircles(
         original: Bitmap,
@@ -578,7 +664,7 @@ class AttendanceProcessor {
                 canvas.drawCircle(cx, cy, 14f, paintCornerRing)
             }
 
-            // Draw Green dots for Present (R=12 circle detected), Red dots for Empty
+            // Draw exactly 1 dot per cell: Green for Present (1), Red for Absent/Empty (0)
             for (r in 0 until minOf(rowCenters.size, results.size)) {
                 val cy = rowCenters[r].toFloat()
                 val attList = results[r]["attendance"] as? List<*> ?: emptyList<Any>()
