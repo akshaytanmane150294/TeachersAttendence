@@ -132,9 +132,10 @@ Write-Host $DEVICE_ID -ForegroundColor Cyan
 # ==========================================
 
 Write-Host ""
-Write-Host "[2/10] Setting ADB reverse for port $SERVER_PORT..." -ForegroundColor Yellow
+Write-Host "[2/10] Setting ADB reverse for port $SERVER_PORT and 5432 (PostgreSQL)..." -ForegroundColor Yellow
 
 & $ADB -s $DEVICE_ID reverse tcp:$SERVER_PORT tcp:$SERVER_PORT
+& $ADB -s $DEVICE_ID reverse tcp:5432 tcp:5432
 
 if ($LASTEXITCODE -ne 0) {
 
@@ -145,7 +146,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "ADB reverse configured successfully." -ForegroundColor Green
+Write-Host "ADB reverse configured successfully for ports $SERVER_PORT and 5432." -ForegroundColor Green
 
 Write-Host ""
 Write-Host "ADB reverse configuration:" -ForegroundColor Green
@@ -431,6 +432,12 @@ Write-Host "[8/10] Building Android APK..." -ForegroundColor Yellow
 
 cmd.exe /c "gradlew.bat assembleDebug"
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Gradle build issue encountered, resetting daemons and retrying..." -ForegroundColor Yellow
+    cmd.exe /c "gradlew.bat --stop"
+    Start-Sleep -Seconds 2
+    cmd.exe /c "gradlew.bat assembleDebug"
+}
 
 if ($LASTEXITCODE -ne 0) {
 

@@ -141,6 +141,12 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
             finish()
         }
 
+        val teacherName = com.school.attendance.network.AuthManager.getTeacherName()
+        binding.tvAvatarInitial.text = teacherName.trim().firstOrNull()?.uppercase() ?: "T"
+        binding.btnProfileAvatar.setOnClickListener {
+            com.school.attendance.dialogs.TeacherProfileDialog.show(this)
+        }
+
         // Search Filter
         binding.etSearchStudent.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}

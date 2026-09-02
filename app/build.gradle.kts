@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.school.attendance"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -59,6 +59,9 @@ dependencies {
 
     // JWT decode for client-side token parsing
     implementation("com.auth0.android:jwtdecode:2.0.2")
+
+    // PostgreSQL JDBC Direct Connection (Android-safe JRE7 build, no ManagementFactory)
+    implementation("org.postgresql:postgresql:42.2.9.jre7")
 
     // Google Services & ML Kit (Local OCR)
     implementation("com.google.android.gms:play-services-location:21.3.0")

@@ -10,25 +10,54 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/primary"
-        android:orientation="vertical"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:padding="20dp">
 
-        <TextView
-            android:id="@+id/tvWelcome"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/dashboard_title"
-            android:textColor="@color/white"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+        <FrameLayout
+            android:id="@+id/btnProfileAvatar"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginEnd="14dp"
+            android:background="@drawable/bg_glass_circle"
+            android:backgroundTint="#33FFFFFF"
+            android:clickable="true"
+            android:focusable="true">
 
-        <TextView
-            android:id="@+id/tvTeacherSubject"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/tvAvatarInitial"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="T"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="#CCFFFFFF"
-            android:textSize="13sp" />
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvWelcome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/dashboard_title"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTeacherSubject"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

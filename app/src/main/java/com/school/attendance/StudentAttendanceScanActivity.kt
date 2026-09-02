@@ -66,7 +66,13 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
 
         OpenCVLoader.initDebug()
 
-        schoolCode = intent.getStringExtra("schoolCode") ?: "N/A"
+        val passedSchoolCode = intent.getStringExtra("schoolCode")
+        schoolCode = if (!passedSchoolCode.isNullOrBlank() && passedSchoolCode != "N/A") {
+            passedSchoolCode
+        } else {
+            val cached = com.school.attendance.network.AuthManager.getSchoolCode()
+            if (cached.isNotEmpty()) cached else "N/A"
+        }
         className = intent.getStringExtra("className") ?: "5A"
         val cal = Calendar.getInstance()
         scanYear = intent.getIntExtra("year", cal.get(Calendar.YEAR))
@@ -89,6 +95,12 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
         // Header Actions
         binding.btnBack.setOnClickListener { finish() }
         binding.btnFlash.setOnClickListener { toggleTorch() }
+
+        val teacherName = com.school.attendance.network.AuthManager.getTeacherName()
+        binding.tvAvatarInitial.text = teacherName.trim().firstOrNull()?.uppercase() ?: "T"
+        binding.btnProfileAvatar.setOnClickListener {
+            com.school.attendance.dialogs.TeacherProfileDialog.show(this)
+        }
 
         // Capture
         binding.btnCapturePaper.setOnClickListener { takePhoto() }
@@ -213,8 +225,8 @@ class StudentAttendanceScanActivity : AppCompatActivity(), android.hardware.Sens
             val diffLuma = kotlin.math.abs(avgLuminance - lastAvgLuminance)
             lastAvgLuminance = avgLuminance
 
-            val isLightOk = lightPct in 40..90
-            val isTiltOk = currentTiltAngle <= 25f
+            val isLightOk = lightPct in 45..75
+            val isTiltOk = currentTiltAngle <= 20f
             val isSteady = diffLuma <= 9.0f
             val isAllReady = isLightOk && isTiltOk
 

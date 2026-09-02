@@ -1,4 +1,4 @@
-﻿package com.school.attendance
+package com.school.attendance
 
 import android.content.Intent
 import android.os.Bundle
@@ -36,10 +36,20 @@ class DashboardActivity : AppCompatActivity() {
         loadTeacherProfile()
         loadAttendance()
 
-        binding.swipeRefresh.setOnRefreshListener { loadAttendance() }
+        val teacherName = AuthManager.getTeacherName()
+        binding.tvAvatarInitial.text = teacherName.trim().firstOrNull()?.uppercase() ?: "T"
+        binding.btnProfileAvatar.setOnClickListener {
+            com.school.attendance.dialogs.TeacherProfileDialog.show(this)
+        }
 
         binding.cardMarkAttendance.setOnClickListener {
-            startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
+            val intent = Intent(this, StudentAttendanceScanActivity::class.java).apply {
+                putExtra("schoolCode", AuthManager.getSchoolCode())
+                putExtra("schoolName", AuthManager.getSchoolName())
+                putExtra("teacherName", AuthManager.getTeacherName())
+                putExtra("className", "5A")
+            }
+            startActivity(intent)
         }
 
         binding.cardLogout.setOnClickListener {

@@ -1,4 +1,4 @@
-﻿package com.school.attendance
+package com.school.attendance
 
 import android.Manifest
 import android.content.Intent
@@ -56,30 +56,25 @@ class MarkTeacherAttendanceActivity : AppCompatActivity() {
         binding = ActivityMarkTeacherAttendanceBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.tvLocationStatus.text = "Please capture a photo to mark attendance"
-        binding.btnSubmitAttendance.isEnabled = false
+        // Directly display the post-attendance screen with "Student Attendance (Scan Paper)" button
+        showSuccessUI("You Already Marked Attendance.")
 
         loadTeacherProfile()
 
-        binding.btnCapture.setOnClickListener {
-            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            cameraLauncher.launch(intent)
-        }
-
-        binding.btnSubmitAttendance.setOnClickListener { submitAttendance() }
-
         binding.btnStudentAttendance.setOnClickListener {
             val intent = Intent(this, StudentAttendanceScanActivity::class.java)
-            intent.putExtra("schoolName", schoolName)
-            intent.putExtra("schoolCode", schoolCode)
-            intent.putExtra("teacherName", teacherName)
+            intent.putExtra("schoolName", schoolName.ifEmpty { AuthManager.getSchoolName() })
+            intent.putExtra("schoolCode", schoolCode.ifEmpty { AuthManager.getSchoolCode() })
+            intent.putExtra("teacherName", teacherName.ifEmpty { AuthManager.getTeacherName() })
             intent.putExtra("className", "5A")
             startActivity(intent)
         }
 
-        binding.btnLogout.setOnClickListener { performLogout() }
+        binding.btnTopProfile.setOnClickListener {
+            com.school.attendance.dialogs.TeacherProfileDialog.show(this)
+        }
 
-        requestCameraPermission()
+        binding.btnLogout.setOnClickListener { performLogout() }
     }
 
     private fun performLogout() {
@@ -89,6 +84,20 @@ class MarkTeacherAttendanceActivity : AppCompatActivity() {
     }
 
     private fun loadTeacherProfile() {
+        // 1. First load from offline cached profile
+        val cachedTeacher = AuthManager.getTeacherName()
+        val cachedSchool = AuthManager.getSchoolName()
+        val cachedCode = AuthManager.getSchoolCode()
+        if (cachedTeacher.isNotEmpty() && cachedTeacher != "Teacher") {
+            teacherName = cachedTeacher
+            schoolName = cachedSchool
+            schoolCode = cachedCode
+            binding.tvSchoolNameDisplay.text = schoolName
+            binding.tvTeacherNameDisplay.text = "Teacher: $teacherName"
+            binding.tvTopAvatarInitial.text = teacherName.trim().firstOrNull()?.uppercase() ?: "T"
+        }
+
+        // 2. Also try API if server is reachable
         Thread {
             try {
                 val response = ApiClient.get("/auth/me", withAuth = true)
@@ -96,22 +105,25 @@ class MarkTeacherAttendanceActivity : AppCompatActivity() {
                 runOnUiThread {
                     if (response.isSuccessful) {
                         val json = JSONObject(respStr)
-                        teacherName = json.optString("full_name", "Teacher")
-                        schoolName  = json.optString("school_name", "School")
-                        schoolCode  = json.optString("school_code", "")
+                        teacherName = json.optString("full_name", teacherName.ifEmpty { "Teacher" })
+                        schoolName  = json.optString("school_name", schoolName.ifEmpty { "School" })
+                        schoolCode  = json.optString("school_code", schoolCode)
                         binding.tvSchoolNameDisplay.text = schoolName
                         binding.tvTeacherNameDisplay.text = "Teacher: $teacherName"
 
                         // Check if already marked today
                         checkTodayStatus()
-                    } else {
+                    } else if (teacherName.isEmpty()) {
                         binding.tvSchoolNameDisplay.text = "School"
                         binding.tvTeacherNameDisplay.text = "Teacher"
                     }
                 }
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                // If server is offline, keep the offline loaded profile
                 runOnUiThread {
-                    binding.tvSchoolNameDisplay.text = "Server offline"
+                    if (teacherName.isEmpty() || teacherName == "Teacher") {
+                        binding.tvSchoolNameDisplay.text = schoolName.ifEmpty { "Offline Mode" }
+                    }
                 }
             }
         }.start()

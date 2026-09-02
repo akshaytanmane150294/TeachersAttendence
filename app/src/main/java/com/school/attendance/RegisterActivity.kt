@@ -135,8 +135,11 @@ class RegisterActivity : AppCompatActivity() {
                     setLoading(false)
                     if (response.isSuccessful) {
                         AuthManager.saveToken(JSONObject(respStr).getString("token"))
-                        Toast.makeText(this, "Registration successful! Welcome $fullName", Toast.LENGTH_LONG).show()
-                        startActivity(Intent(this, MarkTeacherAttendanceActivity::class.java))
+                        val intent = Intent(this, StudentAttendanceScanActivity::class.java).apply {
+                            putExtra("teacherName", fullName)
+                            putExtra("className", "5A")
+                        }
+                        startActivity(intent)
                         finish()
                     } else {
                         val msg = try { JSONObject(respStr).getString("detail") } catch (e: Exception) { "Registration failed" }

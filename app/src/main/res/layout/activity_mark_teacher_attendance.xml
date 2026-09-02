@@ -8,24 +8,62 @@
     android:gravity="center_horizontal"
     android:background="@color/background">
 
-    <TextView
-        android:id="@+id/tvSchoolNameDisplay"
-        android:layout_width="wrap_content"
+    <!-- Top Header Bar with Profile Avatar on Top-Left -->
+    <RelativeLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="School Name"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:textColor="@color/primary"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginBottom="20dp">
 
-    <TextView
-        android:id="@+id/tvTeacherNameDisplay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Teacher Name"
-        android:textSize="16sp"
-        android:textColor="@color/text_secondary"
-        android:layout_marginBottom="24dp"/>
+        <!-- Top-Left Circular Profile Avatar -->
+        <FrameLayout
+            android:id="@+id/btnTopProfile"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/bg_glass_circle"
+            android:backgroundTint="@color/primary"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/tvTopAvatarInitial"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="T"
+                android:textColor="@color/white"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <!-- Center / Right Title Details -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_toEndOf="@id/btnTopProfile"
+            android:layout_marginStart="14dp"
+            android:layout_centerVertical="true"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvSchoolNameDisplay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="School Name"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary" />
+
+            <TextView
+                android:id="@+id/tvTeacherNameDisplay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Teacher Name"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+    </RelativeLayout>
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="200dp"
@@ -50,6 +88,7 @@
         android:text="Capture School Photo"
         app:icon="@drawable/ic_camera"
         android:layout_marginBottom="16dp"
+        android:visibility="gone"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
     <TextView
@@ -60,6 +99,7 @@
         android:textColor="@color/text_primary"
         android:textSize="16sp"
         android:textStyle="bold"
+        android:visibility="gone"
         android:layout_marginBottom="24dp"/>
 
     <LinearLayout
@@ -68,14 +108,14 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
-        android:visibility="gone"
+        android:visibility="visible"
         android:layout_marginBottom="24dp">
 
         <TextView
             android:id="@+id/tvSuccessMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Marked Successfully"
+            android:text="You Already Marked Attendance."
             android:textColor="@color/success"
             android:textSize="20sp"
             android:textStyle="bold"
@@ -91,6 +131,7 @@
         android:textSize="18sp"
         android:textStyle="bold"
         android:enabled="false"
+        android:visibility="gone"
         android:backgroundTint="@color/accent"/>
 
     <com.google.android.material.button.MaterialButton
@@ -99,7 +140,7 @@
         android:layout_height="56dp"
         android:text="Student Attendance (Scan Paper)"
         android:layout_marginTop="8dp"
-        android:visibility="gone"
+        android:visibility="visible"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         app:icon="@drawable/ic_camera"/>
 
@@ -109,7 +150,7 @@
         android:layout_height="56dp"
         android:text="LOGOUT"
         android:layout_marginTop="8dp"
-        android:visibility="gone"
+        android:visibility="visible"
         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
         android:backgroundTint="@color/primary"/>
 

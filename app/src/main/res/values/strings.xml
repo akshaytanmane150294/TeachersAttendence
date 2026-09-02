@@ -4,8 +4,15 @@
     <string name="login_title">Teacher Login</string>
     <string name="login_subtitle">Sign in to mark attendance</string>
     <string name="email_hint">Email</string>
+    <string name="username_hint">Teacher Code / Username</string>
     <string name="password_hint">Password</string>
     <string name="btn_login">Login</string>
+    <string name="btn_generate_token">Generate Token</string>
+    <string name="token_hint">Security Token (AT-XXXX-XXXX)</string>
+    <string name="copy_token">Copy Token</string>
+    <string name="paste_token">Paste</string>
+    <string name="not_authorized">You aren\'t Authorized</string>
+    <string name="token_validity_label">Valid for 7 days</string>
     <string name="forgot_password">Forgot Password?</string>
     <string name="no_account">Don\'t have an account? Register</string>
 

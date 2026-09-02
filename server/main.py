@@ -59,6 +59,7 @@ def setup_adb_reverse():
                 adb_path = sdk_adb
         if adb_path:
             subprocess.run([adb_path, "reverse", "tcp:8000", "tcp:8000"], capture_output=True, timeout=5)
+            subprocess.run([adb_path, "reverse", "tcp:5432", "tcp:5432"], capture_output=True, timeout=5)
     except Exception:
         pass
 

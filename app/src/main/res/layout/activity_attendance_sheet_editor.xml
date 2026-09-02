@@ -35,6 +35,28 @@
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/white" />
 
+            <!-- Top-Left Circular Profile Avatar -->
+            <FrameLayout
+                android:id="@+id/btnProfileAvatar"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_glass_circle"
+                android:backgroundTint="#33FFFFFF"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/tvAvatarInitial"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="T"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="1dp"
