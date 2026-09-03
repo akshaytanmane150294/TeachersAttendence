@@ -11,16 +11,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingLeft="28dp"
+        android:paddingLeft="24dp"
         android:paddingTop="28dp"
-        android:paddingRight="28dp"
-        android:paddingBottom="100dp">
+        android:paddingRight="24dp"
+        android:paddingBottom="60dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/register_title"
+            android:layout_marginTop="16dp"
+            android:text="Teacher Registration"
             android:textColor="@color/text_primary"
             android:textSize="24sp"
             android:textStyle="bold" />
@@ -28,12 +28,15 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:layout_marginBottom="20dp"
-            android:text="Create your teacher account"
+            android:text="Direct Database Registration (Zero API)"
             android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
 
+        <!-- 1. UDISE ID (School Code) -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilUdiseId"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -41,34 +44,18 @@
             app:boxStrokeColor="@color/primary"
             android:textColorHint="@color/primary"
             app:hintTextColor="@color/primary"
-            android:hint="@string/full_name_hint">
+            android:hint="School UDISE ID (e.g. 22252601008)">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etFullName"
+                android:id="@+id/etUdiseId"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
-                android:inputType="textPersonName" />
+                android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- 2. Teacher ID -->
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:boxBackgroundColor="@color/field_bg"
-            app:boxStrokeColor="@color/primary"
-            android:textColorHint="@color/primary"
-            app:hintTextColor="@color/primary"
-            android:layout_marginTop="12dp"
-            android:hint="@string/employee_id_hint">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etEmployeeId"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="text" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilTeacherId"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -77,15 +64,18 @@
             android:textColorHint="@color/primary"
             app:hintTextColor="@color/primary"
             android:layout_marginTop="12dp"
-            android:hint="@string/city_hint">
+            android:hint="Teacher ID (e.g. GT100001621)">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etCity"
+                android:id="@+id/etTeacherId"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
-                android:inputType="text" />
+                android:inputType="textCapCharacters" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 3. Teacher Name -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilTeacherName"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -94,15 +84,18 @@
             android:textColorHint="@color/primary"
             app:hintTextColor="@color/primary"
             android:layout_marginTop="12dp"
-            android:hint="@string/district_hint">
+            android:hint="Teacher Full Name (e.g. NEHA DEWANGAN)">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etDistrict"
+                android:id="@+id/etTeacherName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
-                android:inputType="text" />
+                android:inputType="textCapWords" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 4. Mobile Number -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilMobileNumber"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -111,52 +104,18 @@
             android:textColorHint="@color/primary"
             app:hintTextColor="@color/primary"
             android:layout_marginTop="12dp"
-            android:hint="@string/state_hint">
+            android:hint="Mobile Number (e.g. 9589324109)">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etState"
+                android:id="@+id/etMobileNumber"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
-                android:inputType="text" />
+                android:inputType="phone" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- 5. Password -->
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:boxBackgroundColor="@color/field_bg"
-            app:boxStrokeColor="@color/primary"
-            android:textColorHint="@color/primary"
-            app:hintTextColor="@color/primary"
-            android:layout_marginTop="12dp"
-            android:hint="Select School (Bhilai District)">
-            <AutoCompleteTextView
-                android:id="@+id/actvSchool"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:boxBackgroundColor="@color/field_bg"
-            app:boxStrokeColor="@color/primary"
-            android:textColorHint="@color/primary"
-            app:hintTextColor="@color/primary"
-            android:layout_marginTop="12dp"
-            android:hint="@string/email_hint">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etEmail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="textEmailAddress" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPassword"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             app:passwordToggleEnabled="true"
             android:layout_width="match_parent"
@@ -166,7 +125,7 @@
             android:textColorHint="@color/primary"
             app:hintTextColor="@color/primary"
             android:layout_marginTop="12dp"
-            android:hint="@string/password_hint">
+            android:hint="Password">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etPassword"
                 android:layout_width="match_parent"
@@ -175,33 +134,16 @@
                 android:inputType="textPassword" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:passwordToggleEnabled="true"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:boxBackgroundColor="@color/field_bg"
-            app:boxStrokeColor="@color/primary"
-            android:textColorHint="@color/primary"
-            app:hintTextColor="@color/primary"
-            android:layout_marginTop="12dp"
-            android:hint="@string/confirm_password_hint">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etConfirmPassword"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="textPassword" />
-        </com.google.android.material.textfield.TextInputLayout>
-
+        <!-- Register Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRegister"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="20dp"
-            android:text="@string/btn_register"
+            android:text="Register &amp; Generate Token"
             android:textAllCaps="false"
             android:textSize="16sp"
+            android:textStyle="bold"
             app:cornerRadius="10dp"
             android:backgroundTint="@color/primary" />
 
@@ -209,9 +151,86 @@
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:layout_gravity="center"
             android:visibility="gone" />
+
+        <!-- Generated Token Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardGeneratedToken"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeColor="@color/success"
+            app:strokeWidth="1.5dp"
+            app:cardBackgroundColor="#F1F8E9">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✅ Registered Successfully! Token Generated:"
+                    android:textColor="#1B5E20"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:id="@+id/tvGeneratedToken"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="AT-0000-0000"
+                        android:textColor="#1B5E20"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <ImageButton
+                        android:id="@+id/btnCopyToken"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_content_copy"
+                        app:tint="#2E7D32"
+                        android:contentDescription="Copy Token" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Saved in Central PostgreSQL (Valid for 7 Days)."
+                    android:textColor="#33691E"
+                    android:textSize="11sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnContinueToApp"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="12dp"
+                    android:text="Continue to Attendance Scan ➡️"
+                    android:textAllCaps="false"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp"
+                    android:backgroundTint="#16A34A" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:id="@+id/tvGoLogin"

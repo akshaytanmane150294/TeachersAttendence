@@ -6,6 +6,7 @@ import java.security.MessageDigest
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.Timestamp
+import java.util.Calendar
 import java.util.Date
 import kotlin.random.Random
 
@@ -30,6 +31,17 @@ sealed class LoginResult {
     data class Success(val profile: TeacherProfile) : LoginResult()
     data class TokenRequired(val message: String) : LoginResult()
     data class Error(val message: String) : LoginResult()
+}
+
+sealed class RegisterResult {
+    data class Success(val token: String, val profile: TeacherProfile) : RegisterResult()
+    data class Error(val message: String) : RegisterResult()
+}
+
+sealed class DirectUploadResult {
+    data class Success(val count: Int, val message: String) : DirectUploadResult()
+    data class Error(val message: String) : DirectUploadResult()
+    data class WindowClosed(val message: String) : DirectUploadResult()
 }
 
 object DirectDbManager {
@@ -233,6 +245,184 @@ object DirectDbManager {
     }
 
     /**
+     * Direct PostgreSQL Registration for Teacher (UDISE ID, Teacher ID, Name, Mobile, Password).
+     * Directly inserts/updates mst_teacher table via JDBC, generates 7-day valid secure token,
+     * and saves into admin_tokens without any API.
+     */
+    fun registerTeacherDirect(
+        udiseId: String,
+        teacherId: String,
+        name: String,
+        mobileNumber: String,
+        passwordInput: String,
+        context: Context? = null
+    ): RegisterResult {
+        val trimmedUdise = udiseId.trim()
+        val trimmedTeacherId = teacherId.trim().uppercase()
+        val trimmedName = name.trim()
+        val trimmedMobile = mobileNumber.trim()
+        val trimmedPassword = passwordInput.trim()
+
+        if (trimmedUdise.isEmpty() || trimmedTeacherId.isEmpty() || trimmedName.isEmpty() || trimmedMobile.isEmpty()) {
+            return RegisterResult.Error("Please fill all required fields")
+        }
+
+        var conn: Connection? = null
+        try {
+            conn = getConnection(context)
+            conn.autoCommit = false
+
+            // 1. Check if teacher_code already exists
+            val checkSql = "SELECT teacher_code FROM mst_teacher WHERE LOWER(teacher_code) = LOWER(?)"
+            val checkStmt = conn.prepareStatement(checkSql)
+            checkStmt.setString(1, trimmedTeacherId)
+            val rs = checkStmt.executeQuery()
+            val exists = rs.next()
+            rs.close()
+            checkStmt.close()
+
+            val passwordHash = if (trimmedPassword.isNotEmpty()) md5Hex(trimmedPassword) else md5Hex(trimmedMobile)
+            val mobileLong = trimmedMobile.toLongOrNull() ?: 0L
+            val udiseLong = trimmedUdise.toLongOrNull() ?: 0L
+
+            if (exists) {
+                // Update existing record
+                val updateSql = """
+                    UPDATE mst_teacher 
+                    SET name_eng = ?, mobile_no = ?, udise_id = ?, current_udise_id = ?, password_hash = ?, status = true
+                    WHERE LOWER(teacher_code) = LOWER(?)
+                """.trimIndent()
+                val upStmt = conn.prepareStatement(updateSql)
+                upStmt.setString(1, trimmedName)
+                upStmt.setLong(2, mobileLong)
+                upStmt.setLong(3, udiseLong)
+                upStmt.setLong(4, udiseLong)
+                upStmt.setString(5, passwordHash)
+                upStmt.setString(6, trimmedTeacherId)
+                upStmt.executeUpdate()
+                upStmt.close()
+            } else {
+                // Insert new teacher into mst_teacher
+                val insertSql = """
+                    INSERT INTO mst_teacher 
+                    (teacher_code, username, name_eng, mobile_no, udise_id, current_udise_id, password_hash, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, true)
+                """.trimIndent()
+                val insStmt = conn.prepareStatement(insertSql)
+                insStmt.setString(1, trimmedTeacherId)
+                insStmt.setString(2, trimmedTeacherId)
+                insStmt.setString(3, trimmedName)
+                insStmt.setLong(4, mobileLong)
+                insStmt.setLong(5, udiseLong)
+                insStmt.setLong(6, udiseLong)
+                insStmt.setString(7, passwordHash)
+                insStmt.executeUpdate()
+                insStmt.close()
+            }
+
+            // Also insert / upsert into users table if table exists for complete compatibility
+            try {
+                val userInsertSql = """
+                    INSERT INTO users (uid, full_name, employee_id, email, password, school_name, school_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (employee_id) DO UPDATE 
+                    SET full_name = EXCLUDED.full_name, school_code = EXCLUDED.school_code
+                """.trimIndent()
+                val uStmt = conn.prepareStatement(userInsertSql)
+                uStmt.setString(1, trimmedTeacherId)
+                uStmt.setString(2, trimmedName)
+                uStmt.setString(3, trimmedTeacherId)
+                uStmt.setString(4, "$trimmedTeacherId@school.gov.in")
+                uStmt.setString(5, passwordHash)
+                uStmt.setString(6, "Govt School ($trimmedUdise)")
+                uStmt.setString(7, trimmedUdise)
+                uStmt.executeUpdate()
+                uStmt.close()
+            } catch (_: Exception) {}
+
+            // 2. Generate Random Token (Format: AT-XXXX-XXXX)
+            val randomPart1 = "%04X".format(Random.nextInt(0x10000))
+            val randomPart2 = "%04X".format(Random.nextInt(0x10000))
+            val tokenPlain = "AT-$randomPart1-$randomPart2"
+            val tokenHash = md5Hex(tokenPlain)
+
+            val now = Timestamp(System.currentTimeMillis())
+            val sevenDaysLater = Timestamp(System.currentTimeMillis() + (7L * 24 * 60 * 60 * 1000L))
+
+            // 3. Deactivate old tokens & Insert new token into admin_tokens
+            try {
+                val deactStmt = conn.prepareStatement("UPDATE admin_tokens SET is_active = FALSE WHERE teacher_code = ? AND is_active = TRUE")
+                deactStmt.setString(1, trimmedTeacherId)
+                deactStmt.executeUpdate()
+                deactStmt.close()
+
+                val insTokenStmt = conn.prepareStatement("""
+                    INSERT INTO admin_tokens (teacher_code, username, token_plain, token_hash, token_valid_from, token_valid_until, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, TRUE, NOW())
+                """.trimIndent())
+                insTokenStmt.setString(1, trimmedTeacherId)
+                insTokenStmt.setString(2, trimmedTeacherId)
+                insTokenStmt.setString(3, tokenPlain)
+                insTokenStmt.setString(4, tokenHash)
+                insTokenStmt.setTimestamp(5, now)
+                insTokenStmt.setTimestamp(6, sevenDaysLater)
+                insTokenStmt.executeUpdate()
+                insTokenStmt.close()
+            } catch (_: Exception) {}
+
+            // 4. Update mst_teacher with token
+            val upTeacherStmt = conn.prepareStatement("""
+                UPDATE mst_teacher 
+                SET login_token_hash = ?, token_valid_from = ?, token_valid_until = ?, username = ?
+                WHERE teacher_code = ?
+            """.trimIndent())
+            upTeacherStmt.setString(1, tokenHash)
+            upTeacherStmt.setTimestamp(2, now)
+            upTeacherStmt.setTimestamp(3, sevenDaysLater)
+            upTeacherStmt.setString(4, trimmedTeacherId)
+            upTeacherStmt.setString(5, trimmedTeacherId)
+            upTeacherStmt.executeUpdate()
+            upTeacherStmt.close()
+
+            conn.commit()
+
+            val profile = TeacherProfile(
+                teacherCode = trimmedTeacherId,
+                username = trimmedTeacherId,
+                fullName = trimmedName,
+                mobileNo = trimmedMobile,
+                udiseId = trimmedUdise,
+                schoolName = "Govt School ($trimmedUdise)",
+                schoolCode = trimmedUdise,
+                designation = "Teacher",
+                tokenExpiryMillis = sevenDaysLater.time
+            )
+
+            // Save to AuthManager
+            com.school.attendance.network.AuthManager.saveTeacherProfile(
+                teacherCode = profile.teacherCode,
+                fullName = profile.fullName,
+                schoolName = profile.schoolName,
+                schoolCode = profile.schoolCode,
+                udiseId = profile.udiseId,
+                designation = profile.designation,
+                mobileNo = profile.mobileNo,
+                tokenExpiryMillis = profile.tokenExpiryMillis
+            )
+            com.school.attendance.network.AuthManager.saveToken(tokenPlain)
+
+            Log.i(TAG, "✅ Successfully registered teacher $trimmedTeacherId directly in PostgreSQL with Token: $tokenPlain")
+            return RegisterResult.Success(tokenPlain, profile)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in registerTeacherDirect: ${e.message}", e)
+            try { conn?.rollback() } catch (_: Exception) {}
+            return RegisterResult.Error("Registration failed: ${e.localizedMessage ?: e.message}")
+        } finally {
+            try { conn?.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
      * Offline Login with Username + Password + Token directly against PostgreSQL.
      */
     fun loginWithToken(
@@ -422,5 +612,223 @@ object DirectDbManager {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(input.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Returns true if current date is within the allowed 5-day upload window (Days 1 to 5 of the month).
+     */
+    fun isUploadWindowOpen(): Boolean {
+        val day = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+        return day in 1..5
+    }
+
+    /**
+     * Returns true if current date is in the month-end window (last 5 days of the month).
+     */
+    fun isMonthEndWindow(): Boolean {
+        val cal = Calendar.getInstance()
+        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
+        val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        return currentDay >= (maxDay - 5)
+    }
+
+    /**
+     * Directly uploads student attendance records to PostgreSQL table 'student_attendance' via JDBC without any API.
+     * Restricts execution to the first 5 days of the month unless bypassWindowCheck is set.
+     */
+    fun uploadStudentAttendanceDirect(
+        records: List<Map<String, Any>>,
+        className: String,
+        month: String,
+        year: Int,
+        daysCount: Int,
+        schoolName: String,
+        schoolCode: String,
+        teacherId: String,
+        context: Context,
+        bypassWindowCheck: Boolean = false
+    ): DirectUploadResult {
+        if (!bypassWindowCheck && !isUploadWindowOpen()) {
+            val day = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+            return DirectUploadResult.WindowClosed(
+                "Central Database Upload is only enabled during the first 5 days of the month (1st to 5th).\n\nCurrent Date: Day $day\n\nYour data is saved safely in your local device storage and will sync at month-end."
+            )
+        }
+
+        var conn: Connection? = null
+        try {
+            conn = getConnection(context)
+            if (conn == null) {
+                return DirectUploadResult.Error("Cannot establish direct JDBC connection to PostgreSQL.")
+            }
+
+            // Ensure student_attendance table exists
+            val createTableSql = """
+                CREATE TABLE IF NOT EXISTS student_attendance (
+                    id              SERIAL PRIMARY KEY,
+                    roll_no         TEXT NOT NULL,
+                    student_name    TEXT NOT NULL,
+                    class_name      TEXT DEFAULT '5A',
+                    month           TEXT DEFAULT '',
+                    year            INTEGER DEFAULT 2026,
+                    days_count      INTEGER DEFAULT 31,
+                    present_count   INTEGER DEFAULT 0,
+                    absent_count    INTEGER DEFAULT 0,
+                    attendance      TEXT DEFAULT '',
+                    school_name     TEXT DEFAULT '',
+                    school_code     TEXT DEFAULT '',
+                    teacher_id      TEXT DEFAULT '',
+                    created_at      TIMESTAMP DEFAULT NOW(),
+                    updated_at      TIMESTAMP DEFAULT NOW(),
+                    UNIQUE (roll_no, class_name, month, year)
+                );
+            """.trimIndent()
+            val stmt = conn.createStatement()
+            stmt.execute(createTableSql)
+            stmt.close()
+
+            val upsertSql = """
+                INSERT INTO student_attendance 
+                (roll_no, student_name, class_name, month, year, days_count, present_count, absent_count, attendance, school_name, school_code, teacher_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ON CONFLICT (roll_no, class_name, month, year)
+                DO UPDATE SET
+                    student_name = EXCLUDED.student_name,
+                    days_count = EXCLUDED.days_count,
+                    present_count = EXCLUDED.present_count,
+                    absent_count = EXCLUDED.absent_count,
+                    attendance = EXCLUDED.attendance,
+                    school_name = EXCLUDED.school_name,
+                    school_code = EXCLUDED.school_code,
+                    teacher_id = EXCLUDED.teacher_id,
+                    updated_at = NOW();
+            """.trimIndent()
+
+            val ps = conn.prepareStatement(upsertSql)
+            var insertedCount = 0
+
+            for (r in records) {
+                val roll = r["roll_no"]?.toString()?.trim() ?: ""
+                val name = r["student_name"]?.toString()?.trim() ?: ""
+                if (roll.isEmpty() && name.isEmpty()) continue
+
+                val pCnt = (r["present_count"] as? Number)?.toInt() ?: 0
+                val aCnt = (r["absent_count"] as? Number)?.toInt() ?: 0
+                val attJson = r["attendance_json"]?.toString() ?: "[]"
+
+                ps.setString(1, roll)
+                ps.setString(2, name)
+                ps.setString(3, className)
+                ps.setString(4, month)
+                ps.setInt(5, year)
+                ps.setInt(6, daysCount)
+                ps.setInt(7, pCnt)
+                ps.setInt(8, aCnt)
+                ps.setString(9, attJson)
+                ps.setString(10, schoolName)
+                ps.setString(11, schoolCode)
+                ps.setString(12, teacherId)
+
+                ps.addBatch()
+                insertedCount++
+            }
+
+            ps.executeBatch()
+            ps.close()
+
+            // Also mark local records as synced
+            try {
+                val localDb = LocalAttendanceDbHelper(context)
+                localDb.markMonthSynced(className, month, year)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not update local sync status: ${e.message}")
+            }
+
+            Log.i(TAG, "✅ [DIRECT JDBC UPLOAD] Successfully upserted $insertedCount student records directly to PostgreSQL (No API)!")
+            return DirectUploadResult.Success(insertedCount, "Successfully saved $insertedCount records to central PostgreSQL!")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ [DIRECT JDBC UPLOAD ERROR] ${e.message}", e)
+            return DirectUploadResult.Error("Database direct upload error: ${e.localizedMessage ?: e.message}")
+        } finally {
+            try { conn?.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Month-End Synchronization: Pushes all unsynced records from local SQLite to PostgreSQL via direct JDBC.
+     */
+    fun syncLocalToRemoteDirect(context: Context, force: Boolean = false): DirectUploadResult {
+        if (!force && !isMonthEndWindow() && !isUploadWindowOpen()) {
+            val day = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+            return DirectUploadResult.WindowClosed(
+                "Month-End Sync is active during the last 5 days of the month.\nCurrent Day: $day.\nAll your attendance records remain safely stored in local device SQLite."
+            )
+        }
+
+        val localDb = LocalAttendanceDbHelper(context)
+        val unsyncedList = localDb.getUnsyncedRecords()
+        if (unsyncedList.isEmpty()) {
+            return DirectUploadResult.Success(0, "All local attendance records are already synced!")
+        }
+
+        var conn: Connection? = null
+        try {
+            conn = getConnection(context)
+            if (conn == null) {
+                return DirectUploadResult.Error("Cannot connect directly to PostgreSQL database.")
+            }
+
+            val upsertSql = """
+                INSERT INTO student_attendance 
+                (roll_no, student_name, class_name, month, year, days_count, present_count, absent_count, attendance, school_name, school_code, teacher_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ON CONFLICT (roll_no, class_name, month, year)
+                DO UPDATE SET
+                    student_name = EXCLUDED.student_name,
+                    days_count = EXCLUDED.days_count,
+                    present_count = EXCLUDED.present_count,
+                    absent_count = EXCLUDED.absent_count,
+                    attendance = EXCLUDED.attendance,
+                    school_name = EXCLUDED.school_name,
+                    school_code = EXCLUDED.school_code,
+                    teacher_id = EXCLUDED.teacher_id,
+                    updated_at = NOW();
+            """.trimIndent()
+
+            val ps = conn.prepareStatement(upsertSql)
+            val syncedIds = mutableListOf<Long>()
+
+            for (r in unsyncedList) {
+                ps.setString(1, r.rollNo)
+                ps.setString(2, r.studentName)
+                ps.setString(3, r.className)
+                ps.setString(4, r.month)
+                ps.setInt(5, r.year)
+                ps.setInt(6, r.daysCount)
+                ps.setInt(7, r.presentCount)
+                ps.setInt(8, r.absentCount)
+                ps.setString(9, r.attendanceJson)
+                ps.setString(10, r.schoolName)
+                ps.setString(11, r.schoolCode)
+                ps.setString(12, r.teacherId)
+
+                ps.addBatch()
+                syncedIds.add(r.id)
+            }
+
+            ps.executeBatch()
+            ps.close()
+
+            // Mark these records as synced in local SQLite
+            localDb.markRecordsSynced(syncedIds)
+
+            Log.i(TAG, "✅ [MONTH-END SYNC] Pushed ${syncedIds.size} records from SQLite to PostgreSQL via direct JDBC!")
+            return DirectUploadResult.Success(syncedIds.size, "Successfully synced ${syncedIds.size} local records to central PostgreSQL!")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ [MONTH-END SYNC ERROR] ${e.message}", e)
+            return DirectUploadResult.Error("Month-end sync error: ${e.localizedMessage ?: e.message}")
+        } finally {
+            try { conn?.close() } catch (_: Exception) {}
+        }
     }
 }

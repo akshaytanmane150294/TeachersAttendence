@@ -17,8 +17,12 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import android.content.res.ColorStateList
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.school.attendance.database.DirectDbManager
+import com.school.attendance.database.DirectUploadResult
+import com.school.attendance.database.LocalAttendanceDbHelper
 import com.school.attendance.databinding.ActivityAttendanceSheetEditorBinding
 import com.school.attendance.network.AuthManager
 import okhttp3.*
@@ -87,6 +91,12 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
 
     private fun loadInitialData() {
         val incoming = scannedDataHolder
+        val cal = Calendar.getInstance()
+        val monthStr = intent.getStringExtra("month") ?: SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
+        val yearVal = intent.getIntExtra("year", cal.get(Calendar.YEAR))
+        val className = intent.getStringExtra("className") ?: "5A"
+        val schoolCode = AuthManager.getSchoolCode()
+
         if (incoming != null && incoming.isNotEmpty()) {
             allStudents.clear()
             incoming.forEach { map ->
@@ -121,12 +131,47 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
                 )
             }
         } else {
-            // Default sample data
-            for (i in 1..25) {
-                val roll = (100 + i).toString()
-                val name = "Student $roll"
-                val marks = MutableList(totalDays) { 1 }
-                allStudents.add(StudentRow(roll, name, marks, totalDays, 0))
+            // Check if existing records are already saved in local SQLite for this school, class, month, year
+            val localDb = LocalAttendanceDbHelper(this)
+            val savedRecords = localDb.getRecordsForClass(schoolCode, className, monthStr, yearVal)
+
+            if (savedRecords.isNotEmpty()) {
+                allStudents.clear()
+                savedRecords.forEach { rec ->
+                    val marksList = mutableListOf<Int>()
+                    try {
+                        val jsonArr = JSONArray(rec.attendanceJson)
+                        for (idx in 0 until jsonArr.length()) {
+                            marksList.add(jsonArr.optInt(idx, 0))
+                        }
+                    } catch (_: Exception) {}
+
+                    while (marksList.size < totalDays) {
+                        marksList.add(0)
+                    }
+
+                    val pCnt = marksList.take(totalDays).count { it == 1 }
+                    val aCnt = totalDays - pCnt
+
+                    allStudents.add(
+                        StudentRow(
+                            rollNo = rec.rollNo,
+                            name = rec.studentName,
+                            marks = marksList,
+                            presentCount = pCnt,
+                            absentCount = aCnt
+                        )
+                    )
+                }
+            } else {
+                // Default sample data
+                allStudents.clear()
+                for (i in 1..25) {
+                    val roll = (100 + i).toString()
+                    val name = "Student $roll"
+                    val marks = MutableList(totalDays) { 1 }
+                    allStudents.add(StudentRow(roll, name, marks, totalDays, 0))
+                }
             }
         }
         updateHeaderBadge()
@@ -161,10 +206,9 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
             showAddStudentDialog()
         }
 
-        // Update Table Button
-        binding.btnUpdateTable.setOnClickListener {
-            renderTable(binding.etSearchStudent.text.toString().trim())
-            Toast.makeText(this, "Table refreshed with ${allStudents.size} students", Toast.LENGTH_SHORT).show()
+        // Save Local Button (Replaced Refresh -> saves to device SQLite)
+        binding.btnSaveLocal.setOnClickListener {
+            saveToLocalSqlite()
         }
 
         // CSV Download Button
@@ -172,9 +216,10 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
             exportAndShareCsv()
         }
 
-        // Update Database Button
+        // Upload to PostgreSQL Button (Direct JDBC, with Lock/Unlock State)
+        updateDatabaseButtonUI()
         binding.btnUpdateDatabase.setOnClickListener {
-            saveToDatabase()
+            checkAndUploadDatabase()
         }
     }
 
@@ -453,6 +498,13 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
             val filename = "Monthly_Attendance_$timestamp.csv"
             val file = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), filename)
 
+            Log.i("DATA_LOG", "==========================================================================================")
+            Log.i("DATA_LOG", "📄 [CSV EXPORT] Generating Attendance CSV for ${allStudents.size} students...")
+            Log.i("DATA_LOG", "📁 Target Path: ${file.absolutePath}")
+            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+            Log.i("DATA_LOG", String.format("%-8s %-20s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Days (1..$totalDays)"))
+            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+
             val writer = FileOutputStream(file)
             val header = StringBuilder("Roll No,Student Name,Present,Absent")
             for (d in 1..totalDays) {
@@ -463,14 +515,22 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
 
             allStudents.forEach { s ->
                 val row = StringBuilder("\"${s.rollNo}\",\"${s.name}\",${s.presentCount},${s.absentCount}")
+                val markStr = StringBuilder()
                 for (d in 0 until totalDays) {
-                    row.append(if (s.marks[d] == 1) ",P" else ",A")
+                    val m = if (s.marks[d] == 1) "P" else "A"
+                    row.append(",$m")
+                    markStr.append("$m ")
                 }
                 row.append("\n")
                 writer.write(row.toString().toByteArray())
+                Log.i("DATA_LOG", String.format("%-8s %-20s %-8d %-8d %s", s.rollNo, s.name, s.presentCount, s.absentCount, markStr.toString().trim()))
             }
             writer.flush()
             writer.close()
+
+            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+            Log.i("DATA_LOG", "✅ [CSV EXPORT COMPLETE] Successfully written ${allStudents.size} records to: ${file.name}")
+            Log.i("DATA_LOG", "==========================================================================================")
 
             // Open Share Intent
             val uri: Uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
@@ -483,91 +543,243 @@ class AttendanceSheetEditorActivity : AppCompatActivity() {
             Toast.makeText(this, "CSV Generated: ${file.name}", Toast.LENGTH_LONG).show()
 
         } catch (e: Exception) {
+            Log.e("DATA_LOG", "❌ [CSV EXPORT ERROR] ${e.message}", e)
             Toast.makeText(this, "CSV Export Error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun saveToDatabase() {
-        val teacherId = AuthManager.getUserId() ?: "offline_teacher"
+    private fun saveToLocalSqlite() {
+        val teacherId = AuthManager.getTeacherCode().ifEmpty { AuthManager.getUserId() ?: "offline_teacher" }
+        val schoolName = AuthManager.getSchoolName()
+        val schoolCode = AuthManager.getSchoolCode()
         val cal = Calendar.getInstance()
-        val monthStr = SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
-        val yearVal = cal.get(Calendar.YEAR)
+        val monthStr = intent.getStringExtra("month") ?: SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
+        val yearVal = intent.getIntExtra("year", cal.get(Calendar.YEAR))
         val className = intent.getStringExtra("className") ?: "5A"
 
-        Log.i("DATA_LOG", "========================================================")
-        Log.i("DATA_LOG", "🚀 [DB UPLOAD 1/3] Starting database upload for ${allStudents.size} students...")
-        Log.i("DATA_LOG", "📅 Metadata: Class=$className | Month=$monthStr | Year=$yearVal | Teacher=$teacherId")
-        Log.i("DATA_LOG", "========================================================")
+        Log.i("DATA_LOG", "==========================================================================================")
+        Log.i("DATA_LOG", "💾 [SQLITE SAVE/UPDATE] Storing ${allStudents.size} student records in local SQLite database...")
+        Log.i("DATA_LOG", "📅 Metadata: School=$schoolCode ($schoolName) | Class=$className | Month=$monthStr $yearVal | Teacher=$teacherId")
+        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+        Log.i("DATA_LOG", String.format("%-8s %-20s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Attendance JSON"))
+        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+
+        val records = allStudents.map { s ->
+            val attArr = JSONArray()
+            s.marks.forEach { attArr.put(it) }
+            val attJson = attArr.toString()
+            Log.i("DATA_LOG", String.format("%-8s %-20s %-8d %-8d %s", s.rollNo, s.name, s.presentCount, s.absentCount, attJson))
+            mapOf(
+                "roll_no" to s.rollNo,
+                "student_name" to s.name,
+                "present_count" to s.presentCount,
+                "absent_count" to s.absentCount,
+                "attendance_json" to attJson
+            )
+        }
+
+        val localDb = LocalAttendanceDbHelper(this)
+        val result = localDb.saveAttendanceRecords(
+            records = records,
+            className = className,
+            month = monthStr,
+            year = yearVal,
+            daysCount = totalDays,
+            schoolName = schoolName,
+            schoolCode = schoolCode,
+            teacherId = teacherId
+        )
+
+        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+        Log.i("DATA_LOG", "✅ [SQLITE SAVE RESULT] Total Processed: ${result.totalProcessed} | Updated: ${result.updatedCount} | Uploaded (New): ${result.insertedCount}")
+        Log.i("DATA_LOG", "==========================================================================================")
+
+        val greenColor = Color.parseColor("#16A34A") // Emerald Green
+
+        if (result.updatedCount > 0 && result.insertedCount == 0) {
+            // All records updated
+            binding.btnSaveLocal.apply {
+                text = "Updated"
+                backgroundTintList = ColorStateList.valueOf(greenColor)
+                setIconResource(R.drawable.ic_check)
+            }
+            Toast.makeText(this, "✅ Updated ${result.updatedCount} records in local SQLite!", Toast.LENGTH_SHORT).show()
+        } else if (result.insertedCount > 0 && result.updatedCount == 0) {
+            // All records newly uploaded / inserted
+            binding.btnSaveLocal.apply {
+                text = "Uploaded"
+                backgroundTintList = ColorStateList.valueOf(greenColor)
+                setIconResource(R.drawable.ic_check)
+            }
+            Toast.makeText(this, "✅ Uploaded ${result.insertedCount} records to local SQLite!", Toast.LENGTH_SHORT).show()
+        } else if (result.updatedCount > 0 && result.insertedCount > 0) {
+            // Mixed (some updated, some inserted)
+            binding.btnSaveLocal.apply {
+                text = "Updated"
+                backgroundTintList = ColorStateList.valueOf(greenColor)
+                setIconResource(R.drawable.ic_check)
+            }
+            Toast.makeText(this, "✅ Updated: ${result.updatedCount} | Uploaded: ${result.insertedCount}", Toast.LENGTH_SHORT).show()
+        } else {
+            binding.btnSaveLocal.apply {
+                text = "Saved"
+                backgroundTintList = ColorStateList.valueOf(greenColor)
+                setIconResource(R.drawable.ic_check)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(if (result.updatedCount > 0) "Data Updated ✅" else "Data Uploaded ✅")
+            .setMessage(
+                "Total records processed: ${result.totalProcessed}\n\n" +
+                "• Updated: ${result.updatedCount}\n" +
+                "• Uploaded (New): ${result.insertedCount}\n\n" +
+                "📅 1-Month Retention: Records older than 30 days are automatically pruned.\n\n" +
+                "🔄 Sync: Local data will sync to central database at month-end."
+            )
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun updateDatabaseButtonUI() {
+        val isWindowOpen = DirectDbManager.isUploadWindowOpen() || DirectDbManager.isMonthEndWindow()
+        if (isWindowOpen) {
+            // Upload is UNLOCKED (Days 1 to 5 or Month-End)
+            binding.btnUpdateDatabase.apply {
+                setIconResource(R.drawable.ic_lock_open)
+                text = "Upload to DB"
+                backgroundTintList = ColorStateList.valueOf(Color.parseColor("#1D4ED8")) // Active Primary Blue
+            }
+        } else {
+            // Upload is LOCKED (Days 6 onwards until Month-End)
+            binding.btnUpdateDatabase.apply {
+                setIconResource(R.drawable.ic_lock)
+                text = "Upload (Locked)"
+                backgroundTintList = ColorStateList.valueOf(Color.parseColor("#475569")) // Slate Gray Locked
+            }
+        }
+    }
+
+    private fun checkAndUploadDatabase() {
+        val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+        val isWindowOpen = DirectDbManager.isUploadWindowOpen()
+        val isMonthEnd = DirectDbManager.isMonthEndWindow()
+
+        if (isWindowOpen) {
+            // Days 1 to 5: Upload window is open (Unlocked)
+            performDirectPostgresUpload(bypassWindow = false)
+        } else if (isMonthEnd) {
+            // Month-end window (Unlocked)
+            AlertDialog.Builder(this)
+                .setTitle("Month-End Sync 🔓")
+                .setMessage("Month-End Sync window is active (Day $currentDay).\n\nDo you want to sync all student records directly to central PostgreSQL database?")
+                .setPositiveButton("Sync Now") { _, _ ->
+                    performDirectPostgresUpload(bypassWindow = true)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        } else {
+            // Days 6 to (Month-End - 5): Upload is LOCKED
+            AlertDialog.Builder(this)
+                .setTitle("Upload is Locked 🔒")
+                .setMessage(
+                    "Central PostgreSQL Upload is locked right now.\n\n" +
+                    "It automatically unlocks during:\n" +
+                    "• Days 1 to 5 of the month (Starting 5 days)\n" +
+                    "• Month-End Sync Window (Last 5 days)\n\n" +
+                    "Today is Day $currentDay. Your data is safely saved in local SQLite storage."
+                )
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Force Unlock") { _, _ ->
+                    performDirectPostgresUpload(bypassWindow = true)
+                }
+                .show()
+        }
+    }
+
+    private fun performDirectPostgresUpload(bypassWindow: Boolean) {
+        val teacherId = AuthManager.getTeacherCode().ifEmpty { AuthManager.getUserId() ?: "offline_teacher" }
+        val schoolName = AuthManager.getSchoolName()
+        val schoolCode = AuthManager.getSchoolCode()
+        val cal = Calendar.getInstance()
+        val monthStr = intent.getStringExtra("month") ?: SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
+        val yearVal = intent.getIntExtra("year", cal.get(Calendar.YEAR))
+        val className = intent.getStringExtra("className") ?: "5A"
+
+        Log.i("DATA_LOG", "==========================================================================================")
+        Log.i("DATA_LOG", "🚀 [POSTGRES DIRECT UPLOAD] Starting PostgreSQL direct upload for ${allStudents.size} students (NO API)...")
+        Log.i("DATA_LOG", "📅 Metadata: School=$schoolCode ($schoolName) | Class=$className | Month=$monthStr $yearVal | Teacher=$teacherId")
+        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+        Log.i("DATA_LOG", String.format("%-8s %-20s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Target Table"))
+        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
 
         val progressDialog = android.app.ProgressDialog(this).apply {
-            setMessage("Uploading ${allStudents.size} student records to Database...")
+            setMessage("Uploading ${allStudents.size} records directly to PostgreSQL (No API)...")
             setCancelable(false)
             show()
         }
 
         Thread {
-            try {
-                val jsonPayload = JSONObject().apply {
-                    put("total_students", allStudents.size)
-                    put("days_count", totalDays)
-                    put("class_name", className)
-                    put("month", intent.getStringExtra("month") ?: monthStr)
-                    put("year", intent.getIntExtra("year", yearVal))
-                    put("teacher_id", teacherId)
+            val records = allStudents.map { s ->
+                val attArr = JSONArray()
+                s.marks.forEach { attArr.put(it) }
+                Log.i("DATA_LOG", String.format("%-8s %-20s %-8d %-8d %s", s.rollNo, s.name, s.presentCount, s.absentCount, "student_attendance (UPSERT)"))
+                mapOf(
+                    "roll_no" to s.rollNo,
+                    "student_name" to s.name,
+                    "present_count" to s.presentCount,
+                    "absent_count" to s.absentCount,
+                    "attendance_json" to attArr.toString()
+                )
+            }
 
-                    val arr = JSONArray()
-                    allStudents.forEach { s ->
-                        val obj = JSONObject().apply {
-                            put("roll_no", s.rollNo)
-                            put("student_name", s.name)
-                            put("present_count", s.presentCount)
-                            put("absent_count", s.absentCount)
-                            val attArr = JSONArray()
-                            s.marks.forEach { attArr.put(it) }
-                            put("attendance", attArr)
-                        }
-                        arr.put(obj)
-                    }
-                    put("data", arr)
-                }
+            // Direct JDBC upload without any API call
+            val result = DirectDbManager.uploadStudentAttendanceDirect(
+                records = records,
+                className = className,
+                month = monthStr,
+                year = yearVal,
+                daysCount = totalDays,
+                schoolName = schoolName,
+                schoolCode = schoolCode,
+                teacherId = teacherId,
+                context = this,
+                bypassWindowCheck = bypassWindow
+            )
 
-                Log.i("DATA_LOG", "🌐 [DB UPLOAD 2/3] Sending HTTP POST to /api/update_attendance ...")
-                val response = com.school.attendance.network.ApiClient.post("/api/update_attendance", jsonPayload, withAuth = true)
-                val respStr = response.body?.string() ?: ""
-                Log.i("DATA_LOG", "📥 [DB UPLOAD 3/3] Server Response: HTTP ${response.code} -> $respStr")
-
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    if (response.isSuccessful) {
-                        val json = try { JSONObject(respStr) } catch (e: Exception) { null }
-                        val msg = json?.optString("message") ?: "Attendance saved successfully to Database!"
-                        val totalSaved = json?.optInt("total_saved", allStudents.size) ?: allStudents.size
-
-                        Log.i("DATA_LOG", "========================================================")
-                        Log.i("DATA_LOG", "✅ [DB UPLOAD SUCCESS] Uploaded $totalSaved records to PostgreSQL Database!")
-                        allStudents.take(5).forEach { s ->
-                            Log.i("DATA_LOG", "   👉 Stored: Roll ${s.rollNo} | ${s.name} | Present: ${s.presentCount} | Absent: ${s.absentCount}")
-                        }
-                        if (allStudents.size > 5) {
-                            Log.i("DATA_LOG", "   ... and ${allStudents.size - 5} more students")
-                        }
-                        Log.i("DATA_LOG", "========================================================")
-
+            runOnUiThread {
+                progressDialog.dismiss()
+                when (result) {
+                    is DirectUploadResult.Success -> {
+                        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+                        Log.i("DATA_LOG", "✅ [POSTGRES SUCCESS] Successfully uploaded/upserted ${result.count} records to PostgreSQL table 'student_attendance'!")
+                        Log.i("DATA_LOG", "==========================================================================================")
                         AlertDialog.Builder(this)
-                            .setTitle("Database Updated ✅")
-                            .setMessage("$msg\n\nTotal: $totalSaved student records uploaded to Database.")
+                            .setTitle("Database Updated Directly ✅")
+                            .setMessage("${result.message}\n\nTotal: ${result.count} student records saved directly to PostgreSQL (No API).")
                             .setPositiveButton("OK", null)
                             .show()
-                    } else {
-                        Log.e("DATA_LOG", "❌ [DB UPLOAD FAILED] HTTP ${response.code}: $respStr")
-                        Toast.makeText(this, "Failed to upload to DB (HTTP ${response.code})", Toast.LENGTH_LONG).show()
                     }
-                }
-            } catch (e: Exception) {
-                Log.e("DATA_LOG", "❌ [DB UPLOAD ERROR] Exception: ${e.message}", e)
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    Toast.makeText(this, "Database upload error: ${e.localizedMessage ?: e.message}", Toast.LENGTH_LONG).show()
+                    is DirectUploadResult.WindowClosed -> {
+                        Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+                        Log.i("DATA_LOG", "⏳ [POSTGRES WINDOW CLOSED] ${result.message}")
+                        Log.i("DATA_LOG", "==========================================================================================")
+                        AlertDialog.Builder(this)
+                            .setTitle("Upload Window Restricted ⏳")
+                            .setMessage(result.message)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                    is DirectUploadResult.Error -> {
+                        Log.e("DATA_LOG", "------------------------------------------------------------------------------------------")
+                        Log.e("DATA_LOG", "❌ [POSTGRES ERROR] ${result.message}")
+                        Log.i("DATA_LOG", "==========================================================================================")
+                        AlertDialog.Builder(this)
+                            .setTitle("Database Error ❌")
+                            .setMessage(result.message)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
                 }
             }
         }.start()

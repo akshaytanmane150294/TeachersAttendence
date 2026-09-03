@@ -56,6 +56,51 @@ class LoginActivity : AppCompatActivity() {
         binding.btnLogin.setOnClickListener {
             attemptLogin()
         }
+
+        // 5. Navigate to Registration Screen for New Users
+        binding.tvGoRegister.setOnClickListener {
+            startActivity(Intent(this, RegisterActivity::class.java))
+        }
+
+        // Check if redirected from Registration
+        handleIncomingRegistrationData(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingRegistrationData(intent)
+    }
+
+    private fun handleIncomingRegistrationData(intent: Intent?) {
+        val regCode = intent?.getStringExtra("registeredTeacherCode")
+        val regPassword = intent?.getStringExtra("registeredPassword")
+        val regToken = intent?.getStringExtra("registeredToken")
+
+        if (!regCode.isNullOrEmpty() && !regToken.isNullOrEmpty()) {
+            binding.etUsername.setText(regCode)
+            if (!regPassword.isNullOrEmpty()) {
+                binding.etPassword.setText(regPassword)
+            }
+            binding.etToken.setText(regToken)
+            binding.cardGeneratedToken.visibility = View.VISIBLE
+            binding.tvGeneratedToken.text = regToken
+
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Now you can login with this Token ✅")
+                .setMessage(
+                    "Teacher Registration Successful in Central PostgreSQL!\n\n" +
+                    "• Teacher ID: $regCode\n" +
+                    "🔑 Generated Token: $regToken\n" +
+                    "(Saved in DB & Valid for 7 Days)\n\n" +
+                    "Click 'Login Now' to enter the app."
+                )
+                .setPositiveButton("Login Now ➡️") { _, _ ->
+                    attemptLogin()
+                }
+                .setNegativeButton("OK", null)
+                .show()
+        }
     }
 
     /**

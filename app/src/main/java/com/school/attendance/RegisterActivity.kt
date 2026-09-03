@@ -1,155 +1,152 @@
 package com.school.attendance
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Patterns
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.school.attendance.database.DirectDbManager
+import com.school.attendance.database.RegisterResult
 import com.school.attendance.databinding.ActivityRegisterBinding
-import com.school.attendance.network.ApiClient
-import com.school.attendance.network.AuthManager
-import org.json.JSONObject
-import java.io.IOException
 
 class RegisterActivity : AppCompatActivity() {
-    private val NAME_REGEX = Regex("^[A-Za-z ]{3,50}$")
-    private val EMPLOYEE_REGEX = Regex("^[A-Za-z0-9_-]{3,20}$")
-    private val LOCATION_REGEX = Regex("^[A-Za-z ]{2,40}$")
-    private val PASSWORD_REGEX = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@#\$%^&+=!]).{8,}$")
 
     private lateinit var binding: ActivityRegisterBinding
-
-    data class School(val name: String, val code: String, val lat: Double, val lng: Double) {
-        override fun toString(): String = name
-    }
-
-    private val defaultSchools = listOf(
-        School("Bhilai Nagar Higher Secondary School", "BNHSS001", 21.1920, 81.3700),
-        School("DAV Public School Bhilai", "DAVBHILAI", 21.1950, 81.3810),
-        School("Govt Boys Higher Secondary School Sector 9", "GBHSS009", 21.2001, 81.3695),
-        School("Govt Girls Higher Secondary School Sector 6", "GGHSS006", 21.1875, 81.3840),
-        School("Govt Higher Secondary School Bhilai", "GHSS001", 21.1938, 81.3786),
-        School("Govt Higher Secondary School Charoda", "GHSSC001", 21.2200, 81.3600),
-        School("Govt Higher Secondary School Durg", "GHSSD001", 21.1890, 81.2860),
-        School("Govt Primary School Risali", "GPSR001", 21.1800, 81.4000),
-        School("Kendriya Vidyalaya Bhilai Steel Plant", "KVBSP001", 21.2030, 81.3750),
-        School("Swami Atmanand Govt English Medium School", "SAGES001", 21.2100, 81.3900)
-    )
-
-    private var schools = mutableListOf<School>()
-    private var selectedSchool: School? = null
+    private var generatedToken: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DirectDbManager.init(this)
+
         binding = ActivityRegisterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize with default schools immediately
-        schools.addAll(defaultSchools)
-        setupSchoolDropdown()
+        // Prefill default Govt School test values
+        binding.etUdiseId.setText("22252601008")
+        binding.etTeacherId.setText("GT100001621")
+        binding.etTeacherName.setText("NEHA DEWANGAN")
+        binding.etMobileNumber.setText("9589324109")
+        binding.etPassword.setText("123456")
 
-        // Then fetch latest from server
-        fetchSchools()
+        // 1. Register Button
+        binding.btnRegister.setOnClickListener {
+            attemptDirectRegister()
+        }
 
-        binding.btnRegister.setOnClickListener { attemptRegister() }
+        // 2. Copy Token Button
+        binding.btnCopyToken.setOnClickListener {
+            val token = binding.tvGeneratedToken.text.toString().trim()
+            if (token.isNotEmpty()) {
+                copyToClipboard(token)
+                Toast.makeText(this, "Token copied to clipboard!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // 3. Continue to App Button
+        binding.btnContinueToApp.setOnClickListener {
+            val teacherName = binding.etTeacherName.text.toString().trim().ifEmpty { "NEHA DEWANGAN" }
+            val intent = Intent(this, StudentAttendanceScanActivity::class.java).apply {
+                putExtra("teacherName", teacherName)
+                putExtra("className", "5A")
+            }
+            startActivity(intent)
+            finish()
+        }
+
+        // 4. Back to Login
         binding.tvGoLogin.setOnClickListener {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
     }
 
-    private fun fetchSchools() {
-        Thread {
-            try {
-                val response = ApiClient.get("/schools")
-                val respStr = response.body?.string() ?: ""
-                runOnUiThread {
-                    if (response.isSuccessful) {
-                        val json = JSONObject(respStr)
-                        val arr = json.getJSONArray("schools")
-                        if (arr.length() > 0) {
-                            schools.clear()
-                            for (i in 0 until arr.length()) {
-                                val s = arr.getJSONObject(i)
-                                schools.add(School(s.getString("name"), s.optString("code",""), s.optDouble("lat",0.0), s.optDouble("lng",0.0)))
-                            }
-                            setupSchoolDropdown()
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                // Keep default schools if network fetch fails
-            }
-        }.start()
-    }
+    private fun attemptDirectRegister() {
+        val udiseId = binding.etUdiseId.text.toString().trim()
+        val teacherId = binding.etTeacherId.text.toString().trim()
+        val teacherName = binding.etTeacherName.text.toString().trim()
+        val mobileNumber = binding.etMobileNumber.text.toString().trim()
+        val password = binding.etPassword.text.toString().trim()
 
-    private fun setupSchoolDropdown() {
-        val names = schools.map { it.name }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, names)
-        binding.actvSchool.setAdapter(adapter)
-        binding.actvSchool.setOnClickListener { binding.actvSchool.showDropDown() }
-        binding.actvSchool.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) binding.actvSchool.showDropDown() }
-        binding.actvSchool.setOnItemClickListener { _, _, position, _ ->
-            if (position in schools.indices) {
-                selectedSchool = schools[position]
-                binding.actvSchool.error = null
-            }
+        binding.tilUdiseId.error = null
+        binding.tilTeacherId.error = null
+        binding.tilTeacherName.error = null
+        binding.tilMobileNumber.error = null
+        binding.tilPassword.error = null
+
+        var isValid = true
+        if (udiseId.isEmpty()) {
+            binding.tilUdiseId.error = "Enter School UDISE ID"
+            isValid = false
         }
-    }
-
-    private fun attemptRegister() {
-        val fullName   = binding.etFullName.text.toString().trim()
-        val employeeId = binding.etEmployeeId.text.toString().trim()
-        val city       = binding.etCity.text.toString().trim()
-        val district   = binding.etDistrict.text.toString().trim()
-        val state      = binding.etState.text.toString().trim()
-        val email      = binding.etEmail.text.toString().trim()
-        val password   = binding.etPassword.text.toString().trim()
-        val confirmPwd = binding.etConfirmPassword.text.toString().trim()
-
-        if (!NAME_REGEX.matches(fullName)) { binding.etFullName.error = "Enter valid full name"; return }
-        if (!EMPLOYEE_REGEX.matches(employeeId)) { binding.etEmployeeId.error = "Employee ID must be 4-10 digits"; return }
-        if (!LOCATION_REGEX.matches(city)) { binding.etCity.error = "Enter valid city"; return }
-        if (!LOCATION_REGEX.matches(state)) { binding.etState.error = "Enter valid state"; return }
-        if (selectedSchool == null) { binding.actvSchool.error = "Please select a school"; return }
-        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) { binding.etEmail.error = "Enter a valid email"; return }
-        if (!PASSWORD_REGEX.matches(password)) { binding.etPassword.error = "Password must contain Uppercase, Lowercase, Number & Special Char"; return }
-        if (password != confirmPwd) { binding.etConfirmPassword.error = "Passwords do not match"; return }
+        if (teacherId.isEmpty()) {
+            binding.tilTeacherId.error = "Enter Teacher ID"
+            isValid = false
+        }
+        if (teacherName.isEmpty()) {
+            binding.tilTeacherName.error = "Enter Teacher Name"
+            isValid = false
+        }
+        if (mobileNumber.isEmpty() || mobileNumber.length < 10) {
+            binding.tilMobileNumber.error = "Enter valid 10-digit Mobile Number"
+            isValid = false
+        }
+        if (password.isEmpty()) {
+            binding.tilPassword.error = "Enter Password"
+            isValid = false
+        }
+        if (!isValid) return
 
         setLoading(true)
-        val school = selectedSchool!!
+
         Thread {
-            try {
-                val body = JSONObject().apply {
-                    put("full_name", fullName); put("employee_id", employeeId)
-                    put("email", email); put("password", password)
-                    put("city", city); put("district", district); put("state", state)
-                    put("school_name", school.name); put("school_code", school.code)
-                    put("school_lat", school.lat); put("school_lng", school.lng)
-                }
-                val response = ApiClient.post("/auth/register", body)
-                val respStr = response.body?.string() ?: ""
-                runOnUiThread {
-                    setLoading(false)
-                    if (response.isSuccessful) {
-                        AuthManager.saveToken(JSONObject(respStr).getString("token"))
-                        val intent = Intent(this, StudentAttendanceScanActivity::class.java).apply {
-                            putExtra("teacherName", fullName)
-                            putExtra("className", "5A")
+            val result = DirectDbManager.registerTeacherDirect(
+                udiseId = udiseId,
+                teacherId = teacherId,
+                name = teacherName,
+                mobileNumber = mobileNumber,
+                passwordInput = password,
+                context = this
+            )
+
+            runOnUiThread {
+                setLoading(false)
+                when (result) {
+                    is RegisterResult.Success -> {
+                        generatedToken = result.token
+                        copyToClipboard(result.token)
+
+                        Toast.makeText(this, "✅ Registration Successful! Now you can login with this Token.", Toast.LENGTH_LONG).show()
+
+                        val intent = Intent(this, LoginActivity::class.java).apply {
+                            putExtra("registeredTeacherCode", result.profile.teacherCode)
+                            putExtra("registeredPassword", password)
+                            putExtra("registeredToken", result.token)
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         }
                         startActivity(intent)
                         finish()
-                    } else {
-                        val msg = try { JSONObject(respStr).getString("detail") } catch (e: Exception) { "Registration failed" }
-                        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                    }
+                    is RegisterResult.Error -> {
+                        Toast.makeText(this, "❌ ${result.message}", Toast.LENGTH_LONG).show()
+                        AlertDialog.Builder(this)
+                            .setTitle("Registration Error ❌")
+                            .setMessage(result.message)
+                            .setPositiveButton("OK", null)
+                            .show()
                     }
                 }
-            } catch (e: Exception) {
-                runOnUiThread { setLoading(false); Toast.makeText(this, "Connection failed: ${e.localizedMessage ?: e.message}", Toast.LENGTH_LONG).show() }
             }
         }.start()
+    }
+
+    private fun copyToClipboard(text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Teacher Token", text)
+        clipboard.setPrimaryClip(clip)
     }
 
     private fun setLoading(loading: Boolean) {

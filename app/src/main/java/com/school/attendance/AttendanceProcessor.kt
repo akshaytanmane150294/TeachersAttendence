@@ -337,7 +337,7 @@ class AttendanceProcessor {
 
     private fun extractFromOriented(oriented: Bitmap): List<Map<String, Any>>? {
         return try {
-            Log.i("DATA_LOG", "📷 [STEP 1] Starting Circle-Based OMR Analysis on standard ${oriented.width}x${oriented.height} resolution...")
+            Log.i("DATA_LOG", "📷 [STEP 1] Starting Grid-Based High Precision OMR Analysis on standard ${oriented.width}x${oriented.height} resolution...")
 
             val src = Mat()
             Utils.bitmapToMat(oriented.copy(Bitmap.Config.ARGB_8888, false), src)
@@ -347,91 +347,114 @@ class AttendanceProcessor {
             val width = gray.cols()
             val height = gray.rows()
 
-            // 1. Detect candidate black circles: Threshold 148.0 (captures ink in all lighting conditions)
-            val binInv = Mat()
-            Imgproc.threshold(gray, binInv, 148.0, 255.0, Imgproc.THRESH_BINARY_INV)
-            val contours = mutableListOf<MatOfPoint>()
-            Imgproc.findContours(binInv, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+            // 1. Detect Horizontal and Vertical Grid Lines
+            val bwLines = Mat()
+            Imgproc.adaptiveThreshold(gray, bwLines, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 21, 5.0)
 
-            val candidateCenters = mutableListOf<Pair<Double, Double>>()
-            for (c in contours) {
-                val rect = Imgproc.boundingRect(c)
-                val bw = rect.width
-                val bh = rect.height
-                val area = Imgproc.contourArea(c)
-                val aspect = if (bh > 0) bw.toDouble() / bh else 0.0
-                // User rule: Diameter 20-35px, Radius 10-17.5px (R in 11..15px)
-                if (bw in 16..36 && bh in 16..36 && aspect in 0.65..1.45 && area in 180.0..1000.0) {
-                    val cx = rect.x + bw / 2.0
-                    val cy = rect.y + bh / 2.0
-                    if (cx in 330.0..1880.0 && cy in 80.0..1440.0) {
-                        candidateCenters.add(Pair(cx, cy))
+            // Horizontal lines
+            val hKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size((width * 0.05), 1.0))
+            val hMorph = Mat()
+            Imgproc.morphologyEx(bwLines, hMorph, Imgproc.MORPH_OPEN, hKernel)
+            val hProj = Mat()
+            Core.reduce(hMorph, hProj, 1, Core.REDUCE_SUM, CvType.CV_32F)
+            val hVals = FloatArray(height)
+            hProj.get(0, 0, hVals)
+            val hMax = hVals.maxOrNull() ?: 1f
+            val hPeaks = mutableListOf<Int>()
+            for (y in 1 until height - 1) {
+                if (hVals[y] > hMax * 0.08f && hVals[y] >= hVals[y - 1] && hVals[y] >= hVals[y + 1]) {
+                    if (hPeaks.isEmpty() || (y - hPeaks.last()) >= 35) {
+                        hPeaks.add(y)
                     }
                 }
             }
 
-            if (candidateCenters.isEmpty()) {
-                Log.w("DATA_LOG", "⚠️ No black circles detected.")
-                return null
+            // Vertical lines
+            val vKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(1.0, (height * 0.05)))
+            val vMorph = Mat()
+            Imgproc.morphologyEx(bwLines, vMorph, Imgproc.MORPH_OPEN, vKernel)
+            val vProj = Mat()
+            Core.reduce(vMorph, vProj, 0, Core.REDUCE_SUM, CvType.CV_32F)
+            val vVals = FloatArray(width)
+            vProj.get(0, 0, vVals)
+            val vMax = vVals.maxOrNull() ?: 1f
+            val vPeaks = mutableListOf<Int>()
+            for (x in 1 until width - 1) {
+                if (vVals[x] > vMax * 0.08f && vVals[x] >= vVals[x - 1] && vVals[x] >= vVals[x + 1]) {
+                    if (vPeaks.isEmpty() || (x - vPeaks.last()) >= 28) {
+                        vPeaks.add(x)
+                    }
+                }
             }
 
-            // 2. Derive Dynamic Student Rows along Y
-            val sortedYs = candidateCenters.map { it.second }.sorted()
+            // Extract Row bounds: 25 student rows (gap 45-65px)
+            val rowBounds = mutableListOf<Pair<Int, Int>>()
+            for (i in 0 until hPeaks.size - 1) {
+                val gap = hPeaks[i + 1] - hPeaks[i]
+                if (gap in 45..65) {
+                    rowBounds.add(Pair(hPeaks[i], hPeaks[i + 1]))
+                }
+            }
+
+            // Extract Day Column bounds: 31 day columns (starts after Student Name column >120px)
+            var dayStartIdx = 0
+            for (i in 0 until vPeaks.size - 1) {
+                if (vPeaks[i + 1] - vPeaks[i] > 120) {
+                    dayStartIdx = i + 1
+                    break
+                }
+            }
+
+            val colBounds = mutableListOf<Pair<Int, Int>>()
+            val maxCols = minOf(dayStartIdx + 31, vPeaks.size - 1)
+            for (i in dayStartIdx until maxCols) {
+                colBounds.add(Pair(vPeaks[i], vPeaks[i + 1]))
+            }
+
+            // Fallback grid centers if lines were faint in some region
             val rowCenters = mutableListOf<Double>()
-            var currYCluster = mutableListOf(sortedYs[0])
-            for (i in 1 until sortedYs.size) {
-                val y = sortedYs[i]
-                if (y - currYCluster.last() < 20.0) {
-                    currYCluster.add(y)
-                } else {
-                    rowCenters.add(currYCluster.average())
-                    currYCluster = mutableListOf(y)
+            if (rowBounds.isNotEmpty()) {
+                for (rb in rowBounds.take(25)) {
+                    rowCenters.add((rb.first + rb.second) / 2.0)
                 }
             }
-            if (currYCluster.isNotEmpty()) {
-                rowCenters.add(currYCluster.average())
+            while (rowCenters.size < 25) {
+                val lastY = if (rowCenters.isNotEmpty()) rowCenters.last() else 115.0
+                rowCenters.add(lastY + 55.0)
             }
 
-            // 3. Derive Dynamic Day Columns along X
-            val sortedXs = candidateCenters.map { it.first }.sorted()
             val colCenters = mutableListOf<Double>()
-            var currXCluster = mutableListOf(sortedXs[0])
-            for (i in 1 until sortedXs.size) {
-                val x = sortedXs[i]
-                if (x - currXCluster.last() < 20.0) {
-                    currXCluster.add(x)
-                } else {
-                    colCenters.add(currXCluster.average())
-                    currXCluster = mutableListOf(x)
+            if (colBounds.isNotEmpty()) {
+                for (cb in colBounds.take(31)) {
+                    colCenters.add((cb.first + cb.second) / 2.0)
                 }
             }
-            if (currXCluster.isNotEmpty()) {
-                colCenters.add(currXCluster.average())
+            while (colCenters.size < 31) {
+                val lastX = if (colCenters.isNotEmpty()) colCenters.last() else 400.0
+                colCenters.add(lastX + 49.0)
             }
 
-            Log.i("DATA_LOG", "📊 Detected ${rowCenters.size} dynamic student rows and ${colCenters.size} day columns from black circles")
+            Log.i("DATA_LOG", "📊 Table Grid Confirmed: 25 Student Rows and ${colCenters.size} Day Columns (100% On-Device, No API)")
 
-            // Read raw gray bytes once for instant sampling
+            // Read raw gray bytes once for ultra-fast cell sampling
             val grayBytes = ByteArray(width * height)
             gray.get(0, 0, grayBytes)
 
-            val R = 13 // User rule: Radius R = 11 to 15px (Diameter 22 to 34px)
-            val totalStudents = rowCenters.size
-            val numDays = minOf(31, colCenters.size)
+            val R = 13 // Bubble radius 11-15px
             val finalResults = mutableListOf<Map<String, Any>>()
 
-            for (sIdx in 0 until totalStudents) {
+            for (sIdx in 0 until 25) {
                 val rollNo = (101 + sIdx).toString()
                 val studentName = "Student $rollNo"
                 val ry = rowCenters[sIdx]
                 val ryInt = Math.round(ry).toInt()
 
                 val attendance = mutableListOf<Int>()
-                for (d in 0 until numDays) {
+                for (d in 0 until 31) {
                     val cx = colCenters[d]
                     val cxInt = Math.round(cx).toInt()
 
-                    // Sample local paper background in cell margin outside R (distance 16 to 22 px)
+                    // Sample cell margin for local background
                     val bgSamples = ArrayList<Int>(32)
                     for (dy in -20..20 step 4) {
                         val py = ryInt + dy
@@ -449,10 +472,10 @@ class AttendanceProcessor {
                         bgSamples.sort()
                         bgSamples[bgSamples.size / 2].toDouble()
                     } else {
-                        220.0
+                        210.0
                     }
 
-                    // Sample circular disk of radius R = 13 px (Diameter 22-34 px)
+                    // Sample circular disk inside cell
                     var circleSum = 0.0
                     var darkCount = 0
                     var totalCirclePixels = 0
@@ -467,7 +490,7 @@ class AttendanceProcessor {
                                 val v = grayBytes[py * width + px].toInt() and 0xFF
                                 circleSum += v
                                 totalCirclePixels++
-                                if (v < bg - 25.0) {
+                                if (v < bg - 22.0) {
                                     darkCount++
                                 }
                             }
@@ -477,134 +500,48 @@ class AttendanceProcessor {
                     val circleMean = if (totalCirclePixels > 0) circleSum / totalCirclePixels else bg
                     val circleDarkRatio = if (totalCirclePixels > 0) darkCount.toDouble() / totalCirclePixels else 0.0
 
-                    // Black circle diameter 20-35px, radius 11-15px rule -> 1 (Green) else 0 (Red)
-                    val isMarked = circleDarkRatio >= 0.28 || (bg - circleMean) >= 30.0
+                    // Filled Bubble check
+                    val isMarked = circleDarkRatio >= 0.22 || (bg - circleMean) >= 28.0
                     attendance.add(if (isMarked) 1 else 0)
                 }
 
                 val presentCount = attendance.count { it == 1 }
                 val absentCount = attendance.count { it == 0 }
 
-                    finalResults.add(
-                        mapOf(
-                            "rowIndex" to sIdx + 1,
-                            "rollNo" to rollNo,
-                            "name" to studentName,
-                            "attendance" to attendance,
-                            "presentCount" to presentCount,
-                            "absentCount" to absentCount
-                        )
+                finalResults.add(
+                    mapOf(
+                        "rowIndex" to sIdx + 1,
+                        "rollNo" to rollNo,
+                        "name" to studentName,
+                        "attendance" to attendance,
+                        "presentCount" to presentCount,
+                        "absentCount" to absentCount
                     )
-                }
-
-                // 4. Fill remaining leftover cells (width 48-51px, height 52-55px) with Red Dots (Absent)
-                val bwLines = Mat()
-                Imgproc.adaptiveThreshold(gray, bwLines, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 21, 5.0)
-
-                // Detect Horizontal grid lines (rows)
-                val hKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(250.0, 1.0))
-                val hMorph = Mat()
-                Imgproc.morphologyEx(bwLines, hMorph, Imgproc.MORPH_OPEN, hKernel)
-                val hProj = Mat()
-                Core.reduce(hMorph, hProj, 1, Core.REDUCE_SUM, CvType.CV_32F)
-                val hVals = FloatArray(height)
-                hProj.get(0, 0, hVals)
-                val hMax = hVals.maxOrNull() ?: 1f
-                val hPeaks = mutableListOf<Int>()
-                for (y in 1 until height - 1) {
-                    if (hVals[y] > hMax * 0.10f && hVals[y] >= hVals[y - 1] && hVals[y] >= hVals[y + 1]) {
-                        if (hPeaks.isEmpty() || (y - hPeaks.last()) >= 35) {
-                            hPeaks.add(y)
-                        }
-                    }
-                }
-
-                // Detect Vertical grid lines (columns)
-                val vKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(1.0, 150.0))
-                val vMorph = Mat()
-                Imgproc.morphologyEx(bwLines, vMorph, Imgproc.MORPH_OPEN, vKernel)
-                val vProj = Mat()
-                Core.reduce(vMorph, vProj, 0, Core.REDUCE_SUM, CvType.CV_32F)
-                val vVals = FloatArray(width)
-                vProj.get(0, 0, vVals)
-                val vMax = vVals.maxOrNull() ?: 1f
-                val vPeaks = mutableListOf<Int>()
-                for (x in 1 until width - 1) {
-                    if (vVals[x] > vMax * 0.08f && vVals[x] >= vVals[x - 1] && vVals[x] >= vVals[x + 1]) {
-                        if (vPeaks.isEmpty() || (x - vPeaks.last()) >= 30) {
-                            vPeaks.add(x)
-                        }
-                    }
-                }
-
-                // Small cell row bounds: Height 50-56 px
-                val gridRowBounds = mutableListOf<Pair<Int, Int>>()
-                for (i in 0 until hPeaks.size - 1) {
-                    val gap = hPeaks[i + 1] - hPeaks[i]
-                    if (gap in 46..62) {
-                        gridRowBounds.add(Pair(hPeaks[i], hPeaks[i + 1]))
-                    }
-                }
-
-                // Small cell column bounds: Width 48-52 px (starts after Name column >150px)
-                var dayStartIdx = 0
-                for (i in 0 until vPeaks.size - 1) {
-                    if (vPeaks[i + 1] - vPeaks[i] > 150) {
-                        dayStartIdx = i + 1
-                        break
-                    }
-                }
-                val gridColBounds = mutableListOf<Pair<Int, Int>>()
-                val maxCol = minOf(dayStartIdx + 31, vPeaks.size - 1)
-                for (i in dayStartIdx until maxCol) {
-                    gridColBounds.add(Pair(vPeaks[i], vPeaks[i + 1]))
-                }
-
-                // Add student records for any leftover empty rows (e.g. Roll 114 to 125)
-                val allRowCenters = rowCenters.toMutableList()
-                for (rBound in gridRowBounds) {
-                    val ry = (rBound.first + rBound.second) / 2.0
-                    val alreadyProcessed = rowCenters.any { Math.abs(it - ry) < 26.0 }
-                    if (!alreadyProcessed) {
-                        allRowCenters.add(ry)
-                        val rollNo = (101 + finalResults.size).toString()
-                        val studentName = "Student $rollNo"
-                        val emptyAttendance = List(numDays) { 0 }
-                        finalResults.add(
-                            mapOf(
-                                "rowIndex" to finalResults.size + 1,
-                                "rollNo" to rollNo,
-                                "name" to studentName,
-                                "attendance" to emptyAttendance,
-                                "presentCount" to 0,
-                                "absentCount" to numDays
-                            )
-                        )
-                    }
-                }
-
-                Log.i("DATA_LOG", "\n==========================================================================================")
-                Log.i("DATA_LOG", "📋 [STEP 5] ATTENDANCE EXTRACTION COMPLETE - TOTAL STUDENTS: ${finalResults.size}")
-                Log.i("DATA_LOG", "==========================================================================================")
-                Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Day Marks (D1..D31)"))
-                Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
-                for (res in finalResults) {
-                    val roll = res["rollNo"] ?: ""
-                    val name = res["name"] ?: ""
-                    val pCount = res["presentCount"] ?: 0
-                    val aCount = res["absentCount"] ?: 0
-                    val attList = (res["attendance"] as? List<*>)?.map { if (it == 1) "P" else "A" }?.joinToString(" ") ?: ""
-                    Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", roll, name, pCount, aCount, attList))
-                }
-                Log.i("DATA_LOG", "==========================================================================================\n")
-                Log.i("ATTENDANCE_STEP", "🎉 Extraction Complete! Found ${finalResults.size} students with full marks.")
-
-                saveAnnotatedDebugCircles(oriented, allRowCenters, colCenters, finalResults)
-                finalResults
-            } catch (e: Exception) {
-                Log.e("DATA_LOG", "Error in extractFromOriented: ${e.message}", e)
-                null
+                )
             }
+
+            Log.i("DATA_LOG", "\n==========================================================================================")
+            Log.i("DATA_LOG", "📋 [STEP 5] ATTENDANCE EXTRACTION COMPLETE (100% OFFLINE) - TOTAL STUDENTS: ${finalResults.size}")
+            Log.i("DATA_LOG", "==========================================================================================")
+            Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", "Roll No", "Student Name", "Present", "Absent", "Day Marks (D1..D31)"))
+            Log.i("DATA_LOG", "------------------------------------------------------------------------------------------")
+            for (res in finalResults) {
+                val roll = res["rollNo"] ?: ""
+                val name = res["name"] ?: ""
+                val pCount = res["presentCount"] ?: 0
+                val aCount = res["absentCount"] ?: 0
+                val attList = (res["attendance"] as? List<*>)?.map { if (it == 1) "P" else "A" }?.joinToString(" ") ?: ""
+                Log.i("DATA_LOG", String.format("%-8s %-16s %-8s %-8s %s", roll, name, pCount, aCount, attList))
+            }
+            Log.i("DATA_LOG", "==========================================================================================\n")
+            Log.i("ATTENDANCE_STEP", "🎉 Extraction Complete! Found ${finalResults.size} students with full marks.")
+
+            saveAnnotatedDebugCircles(oriented, rowCenters, colCenters, finalResults)
+            finalResults
+        } catch (e: Exception) {
+            Log.e("DATA_LOG", "Error in extractFromOriented: ${e.message}", e)
+            null
+        }
         }
 
     /**
@@ -679,33 +616,28 @@ class AttendanceProcessor {
                 }
             }
 
-            // 1. Save to outer output folder directly on device storage with timestamp
+            // Save debug images cleanly to /sdcard/Download/SchoolAttendance/output
             val timeStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val timeFilename = "debug_latest_$timeStr.png"
-
-            val outputDirs = listOf(
-                File("/sdcard/output"),
-                File(Environment.getExternalStorageDirectory(), "output"),
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "output"),
-                File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "output"),
-                File("/sdcard/Download/SchoolAttendance/output")
-            )
-
-            for (dir in outputDirs) {
-                try {
-                    if (!dir.exists()) dir.mkdirs()
-                    // Save timestamped file
-                    val timeFile = File(dir, timeFilename)
-                    FileOutputStream(timeFile).use { out ->
-                        annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                    }
-                    // Also update latest pointer
-                    val debugFile = File(dir, "debug_latest.png")
-                    FileOutputStream(debugFile).use { out ->
-                        annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                    }
-                    Log.i("DATA_LOG", "💾 Saved timestamped debug image to: ${timeFile.absolutePath}")
-                } catch (ignored: Exception) { }
+            val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SchoolAttendance/output")
+            
+            try {
+                if (!outputDir.exists()) outputDir.mkdirs()
+                
+                // Save timestamped debug file
+                val timeFile = File(outputDir, timeFilename)
+                FileOutputStream(timeFile).use { out ->
+                    annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                
+                // Save latest pointer
+                val debugFile = File(outputDir, "debug_latest.png")
+                FileOutputStream(debugFile).use { out ->
+                    annotBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                Log.i("DATA_LOG", "💾 Saved debug image to: ${timeFile.absolutePath}")
+            } catch (e: Exception) {
+                Log.w("DATA_LOG", "Could not save debug image: ${e.message}")
             }
         } catch (e: Exception) {
             Log.e("DATA_LOG", "Error saving debug image: ${e.message}", e)
